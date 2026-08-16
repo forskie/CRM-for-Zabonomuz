@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Ошибка сервера — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">500 — Ошибка сервера</h1>
+</div>
+<div class="panel">
+  <div class="panel__body">
+    <p>Произошла непредвиденная ошибка. Пожалуйста, попробуйте ещё раз или обратитесь к администратору.</p>
+    <div class="form-actions">
+      <a href="{% url 'dashboard' %}" class="btn btn--primary">На главную</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
@@ -201,7 +203,7 @@ class Lesson(models.Model):
 class AttendanceStatus(models.TextChoices):
     PRESENT = "PRESENT", _("Присутствовал")
     ABSENT = "ABSENT", _("Отсутствовал")
-    EXCUSED = "EXCUSED", _("Уважительная причина")
+    LATE = "LATE", _("Опоздал")
 
 
 class Attendance(models.Model):
@@ -230,3 +232,76 @@ class Attendance(models.Model):
 
     def __str__(self) -> str:
         return f"{self.lesson}: {self.student}"
+
+
+class PaymentStatus(models.TextChoices):
+    PAID = "PAID", _("Оплачено")
+    CANCELLED = "CANCELLED", _("Отменён")
+
+
+class Payment(models.Model):
+    """Payment tied to a student and a group via its enrollment history."""
+
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="payments", db_index=True)
+    group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name="payments", db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    paid_at = models.DateField(db_index=True)
+    period = models.DateField(db_index=True)
+    status = models.CharField(max_length=16, choices=PaymentStatus.choices, default=PaymentStatus.PAID, db_index=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-paid_at", "-pk")
+        constraints = [
+            models.CheckConstraint(check=Q(amount__gt=0), name="payment_amount_positive"),
+        ]
+
+    def clean(self) -> None:
+        errors = {}
+        if self.amount is not None and self.amount <= 0:
+            errors["amount"] = "Сумма должна быть больше нуля."
+        if self.student_id and self.group_id and not Enrollment.objects.filter(student=self.student, group=self.group).exists():
+            errors["student"] = "Ученик не был связан с этой группой через зачисление."
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self) -> str:
+        return f"{self.student}: {self.amount} ({self.period:%m.%Y})"
+
+
+class AuditAction(models.TextChoices):
+    PAYMENT_CREATE = "PAYMENT_CREATE", _("Создание платежа")
+    PAYMENT_EDIT = "PAYMENT_EDIT", _("Изменение платежа")
+    PAYMENT_CANCEL = "PAYMENT_CANCEL", _("Отмена платежа")
+    ATTENDANCE_CHANGE = "ATTENDANCE_CHANGE", _("Изменение посещаемости")
+    ENROLLMENT_CREATE = "ENROLLMENT_CREATE", _("Зачисление ученика")
+    ENROLLMENT_END = "ENROLLMENT_END", _("Завершение обучения")
+    STUDENT_CREATE = "STUDENT_CREATE", _("Создание ученика")
+    STUDENT_ARCHIVE = "STUDENT_ARCHIVE", _("Архивация ученика")
+    STUDENT_RESTORE = "STUDENT_RESTORE", _("Восстановление ученика")
+
+
+class AuditLog(models.Model):
+    """Append-only journal for sensitive operations. Never stores credentials."""
+
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="audit_logs")
+    action = models.CharField(max_length=32, choices=AuditAction.choices, db_index=True)
+    target_type = models.CharField(max_length=32, db_index=True)
+    target_id = models.PositiveBigIntegerField(db_index=True)
+    description = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+        verbose_name = "Запись аудита"
+        verbose_name_plural = "Журнал аудита"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Записи журнала аудита нельзя изменять.")
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.get_action_display()} — {self.target_type} #{self.target_id}"

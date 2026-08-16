@@ -1,27 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Преподаватели — CRM центра{% endblock %}
+{% block title %}Оплаты — CRM центра{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1 class="page-title">Преподаватели</h1>
-  {% if user.role != "TEACHER" %}
-    <div class="page-actions">
-      <a href="{% url 'education:teacher-create' %}" class="btn btn--primary">Добавить преподавателя</a>
-    </div>
-  {% endif %}
+  <h1 class="page-title">Оплаты</h1>
+  <div class="page-actions">
+    <a href="{% url 'education:payment-create' %}" class="btn btn--primary">Добавить оплату</a>
+  </div>
 </div>
 
-{% if user.role != "TEACHER" %}
 <form method="get" class="toolbar toolbar--filters">
-  <input name="q" value="{{ request.GET.q }}" placeholder="ФИО, телефон или логин">
+  <input name="q" value="{{ request.GET.q }}" placeholder="Ученик...">
+  <select name="group">
+    <option value="">Все группы</option>
+    {% for group in groups %}
+      <option value="{{ group.pk }}" {% if request.GET.group == group.pk|stringformat:"s" %}selected{% endif %}>{{ group.name }}</option>
+    {% endfor %}
+  </select>
   <select name="status">
     <option value="">Все статусы</option>
     {% for value, label in statuses.choices %}
       <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
     {% endfor %}
   </select>
-  <button type="submit" class="btn">Найти</button>
+  <input type="month" name="month" value="{{ selected_month }}">
+  <button type="submit" class="btn">Фильтровать</button>
 </form>
-{% endif %}
 
 <div class="panel">
   <div class="panel__body panel__body--tight">
@@ -29,21 +32,27 @@
       <table class="table">
         <thead>
           <tr>
-            <th>ФИО</th>
-            <th>Логин</th>
+            <th>Дата</th>
+            <th>Ученик</th>
+            <th>Группа</th>
+            <th>Период</th>
+            <th>Сумма</th>
             <th>Статус</th>
           </tr>
         </thead>
         <tbody>
-          {% for teacher in page_obj %}
+          {% for payment in page_obj %}
             <tr>
-              <td><a href="{% url 'education:teacher-detail' teacher.pk %}"><strong>{{ teacher }}</strong></a></td>
-              <td class="mono">{{ teacher.user.username }}</td>
-              <td><span class="badge badge--{{ teacher.status|lower }}">{{ teacher.get_status_display }}</span></td>
+              <td class="mono">{{ payment.paid_at }}</td>
+              <td><a href="{% url 'education:student-detail' payment.student_id %}">{{ payment.student }}</a></td>
+              <td><a href="{% url 'education:group-detail' payment.group_id %}">{{ payment.group }}</a></td>
+              <td class="mono">{{ payment.period|date:"m.Y" }}</td>
+              <td class="mono">{{ payment.amount }} TJS</td>
+              <td><a href="{% url 'education:payment-detail' payment.pk %}"><span class="badge badge--{{ payment.status|lower }}">{{ payment.get_status_display }}</span></a></td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="3">
+              <td colspan="6">
                 <div class="empty">
                   {% if has_filters %}
                     <div class="empty__title">По заданным фильтрам ничего не найдено.</div>

@@ -80,7 +80,9 @@ class ScheduleLessonTests(TestCase):
         self.client.force_login(self.teacher_user)
         response = self.client.get(reverse("education:lesson-list"))
         self.assertContains(response, own.group.name)
-        self.assertNotContains(response, other.group.name)
+        lesson_pks = [lesson.pk for lesson in response.context["page_obj"]]
+        self.assertIn(own.pk, lesson_pks)
+        self.assertNotIn(other.pk, lesson_pks)
         self.assertEqual(self.client.get(reverse("education:lesson-detail", args=[other.pk])).status_code, 404)
         self.assertEqual(self.client.post(reverse("education:lesson-status", args=[own.pk, LessonStatus.CANCELLED])).status_code, 403)
 

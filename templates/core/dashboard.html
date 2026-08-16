@@ -5,12 +5,150 @@
   <h1 class="page-title">Dashboard</h1>
 </div>
 
-<div class="panel">
-  <div class="panel__body">
-    <div class="empty">
-      <div class="empty__title">Вы авторизованы</div>
-      Операционные показатели будут добавлены на этапе 9.
+<div class="stat-grid">
+  <div class="stat">
+    <div class="stat__label">Students</div>
+    <div class="stat__value">{{ students_total }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Active Students</div>
+    <div class="stat__value">{{ students_active }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Groups</div>
+    <div class="stat__value">{{ groups_active }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Teachers</div>
+    <div class="stat__value">{{ teachers_count }}</div>
+  </div>
+
+  {% if user.role != 'TEACHER' %}
+    <div class="stat">
+      <div class="stat__label">Оплачено за {{ period_start|date:"F Y" }}</div>
+      <div class="stat__value text-success">{{ payments_total }} TJS</div>
     </div>
+    <div class="stat">
+      <div class="stat__label">Платежей за {{ period_start|date:"F Y" }}</div>
+      <div class="stat__value">{{ payments_count }}</div>
+    </div>
+  {% endif %}
+
+  <div class="stat">
+    <div class="stat__label">Присутствовал</div>
+    <div class="stat__value">{{ attendance_present }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Пропуски</div>
+    <div class="stat__value">{{ attendance_absent }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat__label">Опоздания</div>
+    <div class="stat__value">{{ attendance_late }}</div>
   </div>
 </div>
+
+{% if user.role != 'TEACHER' %}
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Recent Payments</h2>
+      <a href="{% url 'education:payment-list' %}" class="btn btn--sm">Все платежи</a>
+    </div>
+    <div class="panel__body panel__body--tight">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Ученик</th>
+              <th>Группа</th>
+              <th>Период</th>
+              <th>Сумма</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for payment in recent_payments %}
+              <tr>
+                <td class="mono">{{ payment.paid_at }}</td>
+                <td><a href="{% url 'education:student-detail' payment.student_id %}">{{ payment.student }}</a></td>
+                <td><a href="{% url 'education:group-detail' payment.group_id %}">{{ payment.group }}</a></td>
+                <td class="mono">{{ payment.period|date:"m.Y" }}</td>
+                <td class="mono">{{ payment.amount }} TJS</td>
+                <td><span class="badge badge--{{ payment.status|lower }}">{{ payment.get_status_display }}</span></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="table-empty">Нет платежей.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Recent Attendance</h2>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Ученик</th>
+            <th>Группа</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in recent_attendance %}
+            <tr>
+              <td class="mono">{{ record.lesson.date }}</td>
+              <td><a href="{% url 'education:student-detail' record.student_id %}">{{ record.student }}</a></td>
+              <td><a href="{% url 'education:group-detail' record.lesson.group_id %}">{{ record.lesson.group }}</a></td>
+              <td><span class="badge badge--{{ record.status|lower }}">{{ record.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="table-empty">Нет отметок посещаемости.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Active Groups</h2>
+    <a href="{% url 'education:group-list' %}" class="btn btn--sm">Все группы</a>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Группа</th>
+            <th>Курс</th>
+            <th>Преподаватель</th>
+            <th>Учеников</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in active_groups %}
+            <tr>
+              <td><a href="{% url 'education:group-detail' group.pk %}"><strong>{{ group.name }}</strong></a></td>
+              <td>{{ group.course }}</td>
+              <td>{{ group.teacher }}</td>
+              <td class="mono">{{ group.student_count }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="table-empty">Нет активных групп.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
 {% endblock %}

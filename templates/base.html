@@ -17,6 +17,8 @@
 {% url 'education:course-list' as courses_url %}
 {% url 'education:group-list' as groups_url %}
 {% url 'education:lesson-list' as lessons_url %}
+{% url 'education:payment-list' as payments_url %}
+{% url 'education:audit-list' as audit_url %}
 {% url 'accounts:user-list' as users_url %}
 <div class="crm-shell">
   {% if user.is_authenticated %}
@@ -32,6 +34,11 @@
       <a class="sidebar__link {% if request.path == groups_url %}active{% endif %}" href="{% url 'education:group-list' %}">Groups</a>
       <a class="sidebar__link {% if request.path == groups_url %}active{% endif %}" href="{% url 'education:group-list' %}">Schedule</a>
       <a class="sidebar__link {% if request.path == lessons_url %}active{% endif %}" href="{% url 'education:lesson-list' %}">Lessons</a>
+
+      {% if user.role != 'TEACHER' %}
+        <a class="sidebar__link {% if request.path == payments_url %}active{% endif %}" href="{% url 'education:payment-list' %}">Payments</a>
+        <a class="sidebar__link {% if request.path == audit_url %}active{% endif %}" href="{% url 'education:audit-list' %}">Audit</a>
+      {% endif %}
 
       {% if user.is_owner %}
         <span class="sidebar__nav-label">Администрирование</span>

@@ -9,7 +9,7 @@ from django.db.models import Q
 
 from apps.accounts.models import UserRole
 
-from .models import Attendance, AttendanceStatus, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, Schedule, Student, Teacher
+from .models import Attendance, AttendanceStatus, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, Payment, PaymentStatus, Schedule, Student, Teacher
 
 
 PHONE_PATTERN = re.compile(r"^[0-9+()\-\s]{5,32}$")
@@ -225,6 +225,11 @@ class AttendanceBulkForm(forms.Form):
             self.fields[f"status_{student_id}"] = forms.ChoiceField(choices=[("", "Не отмечено")] + list(AttendanceStatus.choices), required=False, initial=record.status if record else "", label=student.full_name)
             self.fields[f"note_{student_id}"] = forms.CharField(required=False, initial=record.note if record else "", label="Примечание")
 
+    def rows(self):
+        """Yield (student, status_field, note_field) triplets for a table layout."""
+        for student_id, student in sorted(self.students.items(), key=lambda item: item[1].full_name):
+            yield (student, self[f"status_{student_id}"], self[f"note_{student_id}"])
+
     def save(self):
         if self.lesson.status == LessonStatus.CANCELLED:
             raise ValidationError("Нельзя изменять посещаемость отменённого занятия.")
@@ -238,3 +243,68 @@ class AttendanceBulkForm(forms.Form):
                 record.note = self.cleaned_data[f"note_{student_id}"]
                 record.full_clean()
                 record.save(update_fields=("status", "note", "updated_at"))
+
+
+class PaymentForm(forms.ModelForm):
+    """Student/group come from the form fields or are fixed from the URL route.
+
+    Fixed student/group are rendered as disabled fields so a crafted POST can
+    never replace them; the enrollment-history check runs in clean().
+    """
+
+    class Meta:
+        model = Payment
+        fields = ("student", "group", "amount", "paid_at", "period", "note")
+        widgets = {
+            "paid_at": forms.DateInput(attrs={"type": "date"}),
+            "period": forms.DateInput(attrs={"type": "date"}),
+        }
+        labels = {
+            "student": "Ученик",
+            "group": "Группа",
+            "amount": "Сумма (TJS)",
+            "paid_at": "Дата оплаты",
+            "period": "Период (месяц)",
+            "note": "Заметка",
+        }
+
+    def __init__(self, *args, student=None, group=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fixed_student = student
+        self.fixed_group = group
+        if student is not None:
+            self.fields["student"].disabled = True
+            self.fields["student"].initial = student
+            self.fields["group"].queryset = Group.objects.filter(enrollments__student=student).distinct()
+        if group is not None:
+            self.fields["group"].disabled = True
+            self.fields["group"].initial = group
+            self.fields["student"].queryset = Student.objects.filter(enrollments__group=group).distinct()
+
+    def clean_period(self):
+        period = self.cleaned_data["period"]
+        return period.replace(day=1)
+
+    def clean(self):
+        cleaned = super().clean()
+        student = cleaned.get("student") or self.fixed_student
+        group = cleaned.get("group") or self.fixed_group
+        if student and group and not Enrollment.objects.filter(student=student, group=group).exists():
+            self.add_error("group", "Ученик не был связан с этой группой через зачисление.")
+        return cleaned
+
+    def save(self, commit=True):
+        payment = super().save(commit=False)
+        if self.fixed_student is not None:
+            payment.student = self.fixed_student
+        if self.fixed_group is not None:
+            payment.group = self.fixed_group
+        if commit:
+            payment.save()
+        return payment
+
+
+class PaymentEditForm(PaymentForm):
+    class Meta(PaymentForm.Meta):
+        fields = ("student", "group", "amount", "paid_at", "period", "status", "note")
+        labels = {**PaymentForm.Meta.labels, "status": "Статус"}

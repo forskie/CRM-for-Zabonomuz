@@ -28,16 +28,66 @@
     <h2 class="panel__title">Attendance</h2>
   </div>
   <div class="panel__body">
-    <form method="post" class="form form--wide">
-      {% csrf_token %}
-      {{ attendance_form.non_field_errors }}
-      {{ attendance_form.as_p }}
-      {% if lesson.status != 'CANCELLED' %}
-        <div class="form-actions">
-          <button type="submit" class="btn btn--primary">Сохранить посещаемость</button>
-        </div>
+    {% if can_edit %}
+      {% if attendance_form.students %}
+        <form method="post" class="form form--wide">
+          {% csrf_token %}
+          {{ attendance_form.non_field_errors }}
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Ученик</th>
+                  <th>Статус</th>
+                  <th>Заметка</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for student, status_field, note_field in attendance_form.rows %}
+                  <tr>
+                    <td>{{ student.full_name }}</td>
+                    <td>{{ status_field }}{{ status_field.errors }}</td>
+                    <td>{{ note_field }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if lesson.status != 'CANCELLED' %}
+            <div class="form-actions">
+              <button type="submit" class="btn btn--primary">Сохранить посещаемость</button>
+            </div>
+          {% endif %}
+        </form>
+      {% else %}
+        <div class="empty">Нет активных учеников для отметки.</div>
       {% endif %}
-    </form>
+    {% else %}
+      {% if lesson.attendance_records.all %}
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Ученик</th>
+                <th>Статус</th>
+                <th>Заметка</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for record in lesson.attendance_records.all %}
+                <tr>
+                  <td>{{ record.student }}</td>
+                  <td><span class="badge badge--{{ record.status|lower }}">{{ record.get_status_display }}</span></td>
+                  <td>{{ record.note|default:"—" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty">Отметки посещаемости ещё не заполнены.</div>
+      {% endif %}
+    {% endif %}
 
     <div class="stat-grid attendance-summary">
       <div class="stat">
@@ -53,8 +103,8 @@
         <div class="stat__value text-danger">{{ summary.absent }}</div>
       </div>
       <div class="stat">
-        <div class="stat__label">Excused</div>
-        <div class="stat__value text-info">{{ summary.excused }}</div>
+        <div class="stat__label">Late</div>
+        <div class="stat__value text-warning">{{ summary.late }}</div>
       </div>
       <div class="stat">
         <div class="stat__label">Not marked</div>

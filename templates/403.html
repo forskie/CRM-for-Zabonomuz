@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Доступ запрещён — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">403 — Доступ запрещён</h1>
+</div>
+<div class="panel">
+  <div class="panel__body">
+    <p>У вас нет прав на просмотр этой страницы.</p>
+    <div class="form-actions">
+      <a href="{% url 'dashboard' %}" class="btn btn--primary">На главную</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

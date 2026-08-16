@@ -36,4 +36,12 @@ urlpatterns = [
     path("lessons/<int:pk>/edit/", views.lesson_edit, name="lesson-edit"),
     path("lessons/<int:pk>/<str:status>/", views.lesson_set_status, name="lesson-status"),
     path("schedules/<int:schedule_pk>/lessons/create/", views.lesson_from_schedule, name="lesson-from-schedule"),
+    path("payments/", views.payment_list, name="payment-list"),
+    path("payments/create/", views.payment_create, name="payment-create"),
+    path("payments/<int:pk>/", views.payment_detail, name="payment-detail"),
+    path("payments/<int:pk>/edit/", views.payment_edit, name="payment-edit"),
+    path("payments/<int:pk>/cancel/", views.payment_cancel, name="payment-cancel"),
+    path("students/<int:student_pk>/payments/create/", views.student_payment_create, name="student-payment-create"),
+    path("groups/<int:group_pk>/payments/create/", views.group_payment_create, name="group-payment-create"),
+    path("audit/", views.audit_list, name="audit-list"),
 ]
