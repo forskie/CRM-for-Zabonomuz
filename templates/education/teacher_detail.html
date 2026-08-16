@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ teacher }} — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">{{ teacher }}</h1>
+  {% if user.role != "TEACHER" %}
+    <div class="page-actions">
+      <a href="{% url 'education:teacher-edit' teacher.pk %}" class="btn">Редактировать</a>
+      {% if teacher.status == 'ACTIVE' %}
+        <form class="inline-form" method="post" action="{% url 'education:teacher-status' teacher.pk 'ARCHIVED' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--ghost">Архивировать</button>
+        </form>
+      {% else %}
+        <form class="inline-form" method="post" action="{% url 'education:teacher-status' teacher.pk 'ACTIVE' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--success">Восстановить</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel__body">
+    <dl class="dl">
+      <dt>Логин</dt><dd class="mono">{{ teacher.user.username }}</dd>
+      <dt>Телефон</dt><dd class="mono">{{ teacher.phone|default:"—" }}</dd>
+      <dt>Статус</dt><dd><span class="badge badge--{{ teacher.status|lower }}">{{ teacher.get_status_display }}</span></dd>
+    </dl>
+  </div>
+</div>
+{% endblock %}

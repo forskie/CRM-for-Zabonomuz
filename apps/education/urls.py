@@ -1,0 +1,39 @@
+from django.urls import path
+
+from . import views
+
+
+app_name = "education"
+
+urlpatterns = [
+    path("students/", views.student_list, name="student-list"),
+    path("students/create/", views.student_create, name="student-create"),
+    path("students/<int:pk>/", views.student_detail, name="student-detail"),
+    path("students/<int:pk>/edit/", views.student_edit, name="student-edit"),
+    path("students/<int:pk>/<str:status>/", views.student_set_status, name="student-status"),
+    path("teachers/", views.teacher_list, name="teacher-list"),
+    path("teachers/create/", views.teacher_create, name="teacher-create"),
+    path("teachers/<int:pk>/", views.teacher_detail, name="teacher-detail"),
+    path("teachers/<int:pk>/edit/", views.teacher_edit, name="teacher-edit"),
+    path("teachers/<int:pk>/<str:status>/", views.teacher_set_status, name="teacher-status"),
+    path("courses/", views.course_list, name="course-list"),
+    path("courses/create/", views.course_create, name="course-create"),
+    path("courses/<int:pk>/edit/", views.course_edit, name="course-edit"),
+    path("courses/<int:pk>/<str:status>/", views.course_set_status, name="course-status"),
+    path("groups/", views.group_list, name="group-list"),
+    path("groups/create/", views.group_create, name="group-create"),
+    path("groups/<int:pk>/", views.group_detail, name="group-detail"),
+    path("groups/<int:pk>/edit/", views.group_edit, name="group-edit"),
+    path("groups/<int:pk>/<str:status>/", views.group_set_status, name="group-status"),
+    path("groups/<int:group_pk>/enrollments/create/", views.enrollment_create, name="enrollment-create"),
+    path("enrollments/<int:pk>/end/", views.enrollment_end, name="enrollment-end"),
+    path("groups/<int:group_pk>/schedules/create/", views.schedule_create, name="schedule-create"),
+    path("schedules/<int:pk>/edit/", views.schedule_edit, name="schedule-edit"),
+    path("schedules/<int:pk>/deactivate/", views.schedule_deactivate, name="schedule-deactivate"),
+    path("lessons/", views.lesson_list, name="lesson-list"),
+    path("lessons/create/", views.lesson_create, name="lesson-create"),
+    path("lessons/<int:pk>/", views.lesson_detail, name="lesson-detail"),
+    path("lessons/<int:pk>/edit/", views.lesson_edit, name="lesson-edit"),
+    path("lessons/<int:pk>/<str:status>/", views.lesson_set_status, name="lesson-status"),
+    path("schedules/<int:schedule_pk>/lessons/create/", views.lesson_from_schedule, name="lesson-from-schedule"),
+]

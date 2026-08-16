@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Занятия — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">Занятия</h1>
+  {% if user.role != 'TEACHER' %}
+    <div class="page-actions">
+      <a href="{% url 'education:lesson-create' %}" class="btn btn--primary">Создать занятие</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Время</th>
+            <th>Группа</th>
+            <th>Курс</th>
+            <th>Преподаватель</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lesson in page_obj %}
+            <tr>
+              <td><a href="{% url 'education:lesson-detail' lesson.pk %}" class="mono"><strong>{{ lesson.date }}</strong></a></td>
+              <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
+              <td>{{ lesson.group }}</td>
+              <td>{{ lesson.group.course }}</td>
+              <td>{{ lesson.group.teacher }}</td>
+              <td><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="table-empty">Нет занятий.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if page_obj.has_other_pages %}
+  <nav class="pagination" aria-label="Пагинация">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}">&larr; Назад</a>
+    {% endif %}
+    <span class="current">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}">Вперёд &rarr;</a>
+    {% endif %}
+  </nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ student.full_name }} — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">{{ student.full_name }}</h1>
+  {% if user.role != "TEACHER" %}
+    <div class="page-actions">
+      <a href="{% url 'education:student-edit' student.pk %}" class="btn">Редактировать</a>
+      {% if student.status == 'ACTIVE' %}
+        <form class="inline-form" method="post" action="{% url 'education:student-status' student.pk 'ARCHIVED' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--ghost">Архивировать</button>
+        </form>
+      {% else %}
+        <form class="inline-form" method="post" action="{% url 'education:student-status' student.pk 'ACTIVE' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--success">Восстановить</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel__body">
+    <dl class="dl">
+      <dt>Телефон</dt><dd class="mono">{{ student.phone|default:"—" }}</dd>
+      <dt>Статус</dt><dd><span class="badge badge--{{ student.status|lower }}">{{ student.get_status_display }}</span></dd>
+      <dt>Добавлен</dt><dd>{{ student.created_at }}</dd>
+    </dl>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Active enrollments</h2>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Группа</th>
+            <th>Курс</th>
+            <th>Преподаватель</th>
+            <th>Начало</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for enrollment in active_enrollments %}
+            <tr>
+              <td><a href="{% url 'education:group-detail' enrollment.group_id %}">{{ enrollment.group.name }}</a></td>
+              <td>{{ enrollment.group.course }}</td>
+              <td>{{ enrollment.group.teacher }}</td>
+              <td>{{ enrollment.started_at }}</td>
+              <td class="table-actions">
+                {% if user.role != 'TEACHER' %}
+                  <a href="{% url 'education:enrollment-end' enrollment.pk %}" class="btn btn--sm btn--ghost">Завершить</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="table-empty">Нет активных зачислений.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">History</h2>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Группа</th>
+            <th>Курс</th>
+            <th>Преподаватель</th>
+            <th>Период</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for enrollment in history_enrollments %}
+            <tr>
+              <td>{{ enrollment.group.name }}</td>
+              <td>{{ enrollment.group.course }}</td>
+              <td>{{ enrollment.group.teacher }}</td>
+              <td class="mono">{{ enrollment.started_at }} → {{ enrollment.ended_at }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="table-empty">История пуста.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Attendance history</h2>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Группа</th>
+            <th>Статус</th>
+            <th>Комментарий</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in attendance_history %}
+            <tr>
+              <td class="mono">{{ record.lesson.date }}</td>
+              <td>{{ record.lesson.group }}</td>
+              <td><span class="badge badge--{{ record.status|lower }}">{{ record.get_status_display }}</span></td>
+              <td>{{ record.note }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="table-empty">Нет отметок посещаемости.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Payments</h2>
+  </div>
+  <div class="panel__body">
+    <div class="empty">Будет доступно позднее.</div>
+  </div>
+</section>
+{% endblock %}

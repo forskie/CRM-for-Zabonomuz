@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Пользователи — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">Пользователи</h1>
+  <div class="page-actions">
+    <a href="{% url 'accounts:user-create' %}" class="btn btn--primary">Создать пользователя</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Логин</th>
+            <th>Роль</th>
+            <th>Активен</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for managed_user in users %}
+            <tr>
+              <td><strong>{{ managed_user.username }}</strong></td>
+              <td>
+                <span class="badge {% if managed_user.role == "OWNER" %}badge--owner{% else %}badge--neutral{% endif %}">
+                  {{ managed_user.get_role_display }}
+                </span>
+              </td>
+              <td>
+                <span class="badge {% if managed_user.is_active %}badge--active{% else %}badge--archived{% endif %}">
+                  {{ managed_user.is_active|yesno:"Да,Нет" }}
+                </span>
+              </td>
+              <td class="table-actions">
+                {% if managed_user.role != "OWNER" %}
+                  <a href="{% url 'accounts:user-edit' managed_user.pk %}" class="btn btn--sm">Изменить</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">
+                <div class="empty">
+                  <div class="empty__title">Пользователей нет</div>
+                  Создайте первого пользователя кнопкой выше.
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

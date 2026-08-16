@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Преподаватели — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">Преподаватели</h1>
+  {% if user.role != "TEACHER" %}
+    <div class="page-actions">
+      <a href="{% url 'education:teacher-create' %}" class="btn btn--primary">Добавить преподавателя</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ФИО</th>
+            <th>Логин</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for teacher in page_obj %}
+            <tr>
+              <td><a href="{% url 'education:teacher-detail' teacher.pk %}"><strong>{{ teacher }}</strong></a></td>
+              <td class="mono">{{ teacher.user.username }}</td>
+              <td><span class="badge badge--{{ teacher.status|lower }}">{{ teacher.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3" class="table-empty">Нет преподавателей.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if page_obj.has_other_pages %}
+  <nav class="pagination" aria-label="Пагинация">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}">&larr; Назад</a>
+    {% endif %}
+    <span class="current">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}">Вперёд &rarr;</a>
+    {% endif %}
+  </nav>
+{% endif %}
+{% endblock %}

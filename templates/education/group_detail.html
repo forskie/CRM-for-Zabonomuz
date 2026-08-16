@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ group.name }} — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">{{ group.name }}</h1>
+  {% if user.role != 'TEACHER' %}
+    <div class="page-actions">
+      <a href="{% url 'education:group-edit' group.pk %}" class="btn">Редактировать</a>
+      <a href="{% url 'education:enrollment-create' group.pk %}" class="btn btn--primary">Добавить ученика</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel__body">
+    <dl class="dl">
+      <dt>Курс</dt><dd>{{ group.course }}</dd>
+      <dt>Преподаватель</dt><dd>{{ group.teacher }}</dd>
+      <dt>Стоимость</dt><dd class="mono">{{ group.monthly_fee }} TJS</dd>
+      <dt>Статус</dt><dd><span class="badge badge--{{ group.status|lower }}">{{ group.get_status_display }}</span></dd>
+    </dl>
+  </div>
+</div>
+
+<div class="grid-2">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Schedule</h2>
+      {% if user.role != 'TEACHER' %}
+        <a href="{% url 'education:schedule-create' group.pk %}" class="btn btn--sm">Добавить</a>
+      {% endif %}
+    </div>
+    <div class="panel__body">
+      <ul class="list">
+        {% for schedule in schedules %}
+          <li class="list__item">
+            <span class="list__main">
+              <strong>{{ schedule.get_weekday_display }}</strong>
+              <span class="mono text-muted">{{ schedule.start_time }}–{{ schedule.end_time }}</span>
+              {% if not schedule.is_active %}<span class="badge badge--archived">Неактивно</span>{% endif %}
+            </span>
+            {% if user.role != 'TEACHER' %}
+              <span class="list__actions">
+                <a href="{% url 'education:schedule-edit' schedule.pk %}" class="btn btn--sm">Изменить</a>
+                {% if schedule.is_active %}
+                  <form class="inline-form" method="post" action="{% url 'education:schedule-deactivate' schedule.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--sm btn--ghost">Деактивировать</button>
+                  </form>
+                {% endif %}
+                <a href="{% url 'education:lesson-from-schedule' schedule.pk %}" class="btn btn--sm btn--primary">Создать занятие</a>
+              </span>
+            {% endif %}
+          </li>
+        {% empty %}
+          <li class="list__item list__empty">Нет расписания.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Upcoming lessons</h2>
+    </div>
+    <div class="panel__body">
+      <ul class="list">
+        {% for lesson in upcoming_lessons %}
+          <li class="list__item">
+            <a href="{% url 'education:lesson-detail' lesson.pk %}" class="mono">
+              {{ lesson.date }} {{ lesson.start_time }}–{{ lesson.end_time }}
+            </a>
+          </li>
+        {% empty %}
+          <li class="list__item list__empty">Нет ближайших занятий.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Активные ученики ({{ active_enrollments|length }})</h2>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Ученик</th>
+            <th>Телефон</th>
+            <th>Дата начала</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for enrollment in active_enrollments %}
+            <tr>
+              <td><a href="{% url 'education:student-detail' enrollment.student_id %}">{{ enrollment.student }}</a></td>
+              <td class="mono">{{ enrollment.student.phone }}</td>
+              <td>{{ enrollment.started_at }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3">Нет активных учеников.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

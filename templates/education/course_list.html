@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Курсы — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">Курсы</h1>
+  {% if user.role != "TEACHER" %}
+    <div class="page-actions">
+      <a href="{% url 'education:course-create' %}" class="btn btn--primary">Добавить курс</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Стоимость</th>
+            <th>Статус</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for course in page_obj %}
+            <tr>
+              <td><strong>{{ course.name }}</strong></td>
+              <td class="mono">{{ course.default_monthly_fee }} TJS</td>
+              <td>
+                <span class="badge badge--{{ course.status|lower }}">{{ course.get_status_display }}</span>
+              </td>
+              <td class="table-actions">
+                {% if user.role != "TEACHER" %}
+                  <span class="row-actions">
+                    <a href="{% url 'education:course-edit' course.pk %}" class="btn btn--sm">Изменить</a>
+                    {% if course.status == 'ACTIVE' %}
+                      <form class="inline-form" method="post" action="{% url 'education:course-status' course.pk 'ARCHIVED' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn--sm btn--ghost">Архивировать</button>
+                      </form>
+                    {% else %}
+                      <form class="inline-form" method="post" action="{% url 'education:course-status' course.pk 'ACTIVE' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn--sm btn--success">Восстановить</button>
+                      </form>
+                    {% endif %}
+                  </span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">
+                <div class="empty">
+                  <div class="empty__title">Нет курсов</div>
+                  {% if user.role != "TEACHER" %}Добавьте первый курс кнопкой выше.{% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if page_obj.has_other_pages %}
+  <nav class="pagination" aria-label="Пагинация">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}">&larr; Назад</a>
+    {% endif %}
+    <span class="current">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}">Вперёд &rarr;</a>
+    {% endif %}
+  </nav>
+{% endif %}
+{% endblock %}

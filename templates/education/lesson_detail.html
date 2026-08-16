@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Занятие — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">Занятие</h1>
+  {% if user.role != 'TEACHER' %}
+    <div class="page-actions">
+      <a href="{% url 'education:lesson-edit' lesson.pk %}" class="btn">Изменить</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel__body">
+    <dl class="dl">
+      <dt>Группа</dt><dd>{{ lesson.group }}</dd>
+      <dt>Курс</dt><dd>{{ lesson.group.course }}</dd>
+      <dt>Преподаватель</dt><dd>{{ lesson.group.teacher }}</dd>
+      <dt>Дата</dt><dd class="mono">{{ lesson.date }}</dd>
+      <dt>Время</dt><dd class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</dd>
+      <dt>Статус</dt><dd><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></dd>
+    </dl>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Attendance</h2>
+  </div>
+  <div class="panel__body">
+    <form method="post" class="form form--wide">
+      {% csrf_token %}
+      {{ attendance_form.non_field_errors }}
+      {{ attendance_form.as_p }}
+      {% if lesson.status != 'CANCELLED' %}
+        <div class="form-actions">
+          <button type="submit" class="btn btn--primary">Сохранить посещаемость</button>
+        </div>
+      {% endif %}
+    </form>
+
+    <div class="stat-grid attendance-summary">
+      <div class="stat">
+        <div class="stat__label">Students</div>
+        <div class="stat__value">{{ summary.total }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat__label">Present</div>
+        <div class="stat__value text-success">{{ summary.present }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat__label">Absent</div>
+        <div class="stat__value text-danger">{{ summary.absent }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat__label">Excused</div>
+        <div class="stat__value text-info">{{ summary.excused }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat__label">Not marked</div>
+        <div class="stat__value text-warning">{{ summary.not_marked }}</div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

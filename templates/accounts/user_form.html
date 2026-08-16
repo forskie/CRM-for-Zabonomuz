@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Изменить пользователя {{ managed_user.username }}{% else %}Создать пользователя{% endif %} — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">
+    {% if editing %}Изменить пользователя {{ managed_user.username }}{% else %}Создать пользователя{% endif %}
+  </h1>
+</div>
+
+<div class="panel">
+  <div class="panel__body">
+    <form method="post" class="form">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">Сохранить</button>
+        <a href="{% url 'accounts:user-list' %}" class="btn btn--ghost">Назад</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

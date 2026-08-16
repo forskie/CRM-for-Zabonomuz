@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">{{ title }}</h1>
+</div>
+
+<div class="panel">
+  <div class="panel__body">
+    <form method="post" class="form">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

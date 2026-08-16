@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Вход в CRM — CRM центра{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-brand">CRM <span>центра</span></div>
+
+  <div class="panel auth-card">
+    <div class="panel__head">
+      <h1 class="panel__title">Вход в CRM</h1>
+    </div>
+    <div class="panel__body">
+      <form method="post" class="form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="form-actions">
+          <button type="submit" class="btn btn--primary btn--block">Войти</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
