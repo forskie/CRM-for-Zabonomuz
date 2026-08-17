@@ -701,6 +701,353 @@ p {
   color: var(--danger);
 }
 
+/* ── dashboard layout ─────────────────────────────────── */
+
+.dash-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.2rem;
+  align-items: start;
+}
+
+.dash-main { display: flex; flex-direction: column; gap: 1.2rem; }
+
+.dash-sidebar { display: flex; flex-direction: column; gap: 1.2rem; }
+
+/* ── panel head meta ────────────────────────────────── */
+.panel__head-meta {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+
+/* ── badge ──────────────────────────────────────────── */
+.dash-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: .72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: .02em;
+}
+
+.dash-badge--info {
+  background: var(--info-soft);
+  color: var(--info);
+  border: 1px solid var(--info-border);
+}
+
+/* ── lesson rows ────────────────────────────────────── */
+.dash-lesson {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dash-lesson:last-child { border-bottom: 0; }
+
+.dash-lesson__time {
+  font-family: var(--font-mono);
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--text);
+  min-width: 44px;
+  flex-shrink: 0;
+}
+
+.dash-lesson__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dash-lesson__group {
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-lesson__group:hover { color: var(--link); }
+
+.dash-lesson__teacher,
+.dash-lesson__meta {
+  font-size: .75rem;
+  color: var(--text-secondary);
+}
+
+.dash-lesson__status { flex-shrink: 0; }
+
+.dash-lesson--cancelled { opacity: .55; }
+
+/* ── action required ────────────────────────────────── */
+.dash-actions .panel__body { padding: 0; }
+
+.dash-action {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  padding: .85rem 1rem;
+  text-decoration: none;
+  color: var(--text);
+  transition: background .12s;
+}
+
+.dash-action:hover { background: var(--surface-hover); }
+
+.dash-action__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dash-action__icon--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border: 1px solid var(--warning-border);
+}
+
+.dash-action__icon--ok {
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+
+.dash-action__icon .icon { width: 18px; height: 18px; }
+
+.dash-action__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dash-action__text strong { font-size: .88rem; }
+.dash-action__text span { font-size: .75rem; color: var(--text-secondary); }
+
+.dash-action--ok { cursor: default; }
+.dash-action--ok:hover { background: transparent; }
+
+/* ── sidebar KPI (vertical) ─────────────────────────── */
+.dash-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.dash-kpi-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .55rem .8rem;
+  background: var(--surface);
+}
+
+.dash-kpi-item__value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-kpi-item__label {
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.dash-kpi-item--accent .dash-kpi-item__value { color: var(--success); }
+.dash-kpi-item--money .dash-kpi-item__value { color: var(--primary); }
+
+/* ── quick actions ───────────────────────────────────── */
+.dash-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+/* ── attendance overview ─────────────────────────────── */
+.dash-att { display: flex; flex-direction: column; gap: .55rem; }
+
+.dash-att__row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .88rem;
+}
+
+.dash-att__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dash-att__dot--present { background: var(--success); }
+.dash-att__dot--absent { background: var(--danger); }
+.dash-att__dot--late { background: var(--warning); }
+
+.dash-att__label { color: var(--text-secondary); flex: 1; }
+.dash-att__value { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.dash-att__rate { margin-top: .5rem; }
+
+.dash-att__bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dash-att__bar-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 3px;
+  transition: width .3s;
+}
+
+/* ── upcoming lessons ────────────────────────────────── */
+.dash-upcoming-day { border-bottom: 1px solid var(--border); }
+.dash-upcoming-day:last-child { border-bottom: 0; }
+
+.dash-upcoming-day__header {
+  padding: .5rem 1rem .25rem;
+  font-size: .72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-secondary);
+}
+
+/* ── group rows ──────────────────────────────────────── */
+.dash-group-row {
+  display: flex;
+  align-items: center;
+  padding: .6rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dash-group-row:last-child { border-bottom: 0; }
+
+.dash-group-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+
+.dash-group-row__name {
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.dash-group-row__name:hover { color: var(--link); }
+
+.dash-group-row__teacher {
+  font-size: .75rem;
+  color: var(--text-secondary);
+}
+
+.dash-group-row__count {
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── activity feed ───────────────────────────────────── */
+.dash-activity {
+  display: flex;
+  align-items: flex-start;
+  gap: .7rem;
+  padding: .65rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dash-activity:last-child { border-bottom: 0; }
+
+.dash-activity__icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.dash-activity__icon .icon { width: 15px; height: 15px; }
+
+.dash-activity__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dash-activity__body strong { font-size: .82rem; }
+
+.dash-activity__desc {
+  font-size: .75rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-activity__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.dash-activity__actor {
+  font-size: .72rem;
+  color: var(--text-secondary);
+}
+
+.dash-activity__time {
+  font-size: .68rem;
+  color: var(--text-faint);
+}
+
+/* ── empty state ─────────────────────────────────────── */
+.dash-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  font-size: .85rem;
+  color: var(--text-faint);
+}
+
+/* ── responsive: dashboard ───────────────────────────── */
+@media (max-width: 1100px) {
+  .dash-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .dash-lesson { flex-wrap: wrap; }
+  .dash-activity__meta { display: none; }
+}
+
 /* ---------- definition list ---------- */
 .dl {
   display: grid;
