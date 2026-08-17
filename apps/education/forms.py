@@ -140,8 +140,14 @@ class EnrollmentEndForm(forms.Form):
 class ScheduleForm(forms.ModelForm):
     class Meta:
         model = Schedule
-        fields = ("weekday", "start_time", "end_time", "is_active")
-        widgets = {"start_time": forms.TimeInput(attrs={"type": "time"}), "end_time": forms.TimeInput(attrs={"type": "time"})}
+        fields = ("weekday", "start_time", "end_time", "start_date", "end_date", "is_active")
+        widgets = {
+            "start_time": forms.TimeInput(attrs={"type": "time"}),
+            "end_time": forms.TimeInput(attrs={"type": "time"}),
+            "start_date": forms.DateInput(attrs={"type": "date"}),
+            "end_date": forms.DateInput(attrs={"type": "date"}),
+        }
+        labels = {"start_date": "Период: с", "end_date": "Период: по"}
 
     def __init__(self, *args, group: Group, **kwargs):
         super().__init__(*args, **kwargs)
@@ -160,10 +166,60 @@ class ScheduleForm(forms.ModelForm):
         start, end = cleaned.get("start_time"), cleaned.get("end_time")
         if start and end and start >= end:
             self.add_error("end_time", "Время окончания должно быть позже времени начала.")
+        start_date, end_date = cleaned.get("start_date"), cleaned.get("end_date")
+        if start_date and end_date and start_date > end_date:
+            self.add_error("end_date", "Дата окончания периода не может быть раньше даты начала.")
         if cleaned.get("is_active") and start and end and cleaned.get("weekday") is not None:
             conflicts = Schedule.objects.filter(group__teacher=self.group.teacher, weekday=cleaned["weekday"], is_active=True, start_time__lt=end, end_time__gt=start).exclude(pk=self.instance.pk)
             if conflicts.exists():
                 self.add_error("start_time", "Расписание пересекается с другим занятием этого преподавателя.")
+        return cleaned
+
+
+class ScheduleGenerateForm(forms.Form):
+    date_from = forms.DateField(label="Дата начала", widget=forms.DateInput(attrs={"type": "date"}))
+    date_to = forms.DateField(label="Дата окончания", widget=forms.DateInput(attrs={"type": "date"}))
+
+    def clean(self):
+        cleaned = super().clean()
+        date_from = cleaned.get("date_from")
+        date_to = cleaned.get("date_to")
+        if date_from and date_to and date_from > date_to:
+            self.add_error("date_to", "Дата окончания не может быть раньше даты начала.")
+        return cleaned
+
+
+class LessonRescheduleForm(forms.Form):
+    date = forms.DateField(label="Новая дата", widget=forms.DateInput(attrs={"type": "date"}))
+    start_time = forms.TimeField(label="Новое время начала", widget=forms.TimeInput(attrs={"type": "time"}))
+    end_time = forms.TimeField(label="Новое время окончания", widget=forms.TimeInput(attrs={"type": "time"}))
+
+    def __init__(self, *args, lesson: Lesson, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lesson = lesson
+        if not kwargs.get("data") and not kwargs.get("files"):
+            self.initial["date"] = lesson.date
+            self.initial["start_time"] = lesson.start_time
+            self.initial["end_time"] = lesson.end_time
+
+    def clean(self):
+        cleaned = super().clean()
+        lesson = self.lesson
+        lesson_date = cleaned.get("date")
+        start, end = cleaned.get("start_time"), cleaned.get("end_time")
+        if start and end and start >= end:
+            self.add_error("end_time", "Время окончания должно быть позже времени начала.")
+        if lesson.status == LessonStatus.CANCELLED:
+            self.add_error(None, "Нельзя переносить отменённое занятие.")
+        if lesson_date and start and end:
+            if Lesson.objects.filter(group=lesson.group, date=lesson_date, start_time=start).exclude(pk=lesson.pk).exists():
+                self.add_error("start_time", "В этот день в это время уже есть занятие этой группы.")
+            probe = Lesson(group=lesson.group, schedule=lesson.schedule, date=lesson_date, start_time=start, end_time=end, status=lesson.status)
+            try:
+                probe.full_clean()
+            except ValidationError as exc:
+                for field, errors in exc.message_dict.items():
+                    self.add_error(field if field in ("start_time", "end_time", "date") else None, errors[0])
         return cleaned
 
 
@@ -191,7 +247,25 @@ class LessonForm(forms.ModelForm):
             conflicts = Lesson.objects.filter(group__teacher=group.teacher, date=lesson_date).exclude(status=LessonStatus.CANCELLED).filter(start_time__lt=end, end_time__gt=start).exclude(pk=self.instance.pk)
             if conflicts.exists():
                 self.add_error("start_time", "Занятие пересекается с другим занятием этого преподавателя.")
+            if Lesson.objects.filter(group=group, date=lesson_date, start_time=start).exclude(pk=self.instance.pk).exists():
+                self.add_error("start_time", "В этот день в это время уже есть занятие этой группы.")
         return cleaned
+
+
+class LessonReportForm(forms.ModelForm):
+    class Meta:
+        model = Lesson
+        fields = ("topic", "teacher_note", "homework")
+        labels = {
+            "topic": "Тема занятия",
+            "teacher_note": "Заметка преподавателя",
+            "homework": "Домашнее задание",
+        }
+        widgets = {
+            "topic": forms.TextInput(attrs={"placeholder": "Например: Present Perfect"}),
+            "teacher_note": forms.Textarea(attrs={"rows": 3, "placeholder": "Как прошло занятие, сложности учеников"}),
+            "homework": forms.Textarea(attrs={"rows": 3, "placeholder": "Например: Exercises 4–6"}),
+        }
 
 
 class LessonFromScheduleForm(forms.Form):
@@ -200,6 +274,21 @@ class LessonFromScheduleForm(forms.Form):
     def __init__(self, *args, schedule: Schedule, **kwargs):
         super().__init__(*args, **kwargs)
         self.schedule = schedule
+
+    def clean(self):
+        cleaned = super().clean()
+        lesson_date = cleaned.get("date")
+        schedule = self.schedule
+        if lesson_date:
+            if Lesson.objects.filter(group=schedule.group, date=lesson_date, start_time=schedule.start_time).exists():
+                self.add_error("date", "В этот день в это время уже есть занятие этой группы.")
+            probe = Lesson(group=schedule.group, schedule=schedule, date=lesson_date, start_time=schedule.start_time, end_time=schedule.end_time)
+            try:
+                probe.full_clean()
+            except ValidationError as exc:
+                for errors in exc.message_dict.values():
+                    self.add_error(None, errors[0])
+        return cleaned
 
     def save(self):
         lesson = Lesson(group=self.schedule.group, schedule=self.schedule, date=self.cleaned_data["date"], start_time=self.schedule.start_time, end_time=self.schedule.end_time)

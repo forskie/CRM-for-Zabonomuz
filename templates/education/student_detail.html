@@ -2,7 +2,13 @@
 {% block title %}{{ student.full_name }} — CRM центра{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1 class="page-title">{{ student.full_name }}</h1>
+  <div class="page-head__main">
+    <h1 class="page-title">{{ student.full_name }}</h1>
+    <p class="page-sub">
+      <span class="badge badge--{{ student.status|lower }}">{{ student.get_status_display }}</span>
+      <span class="text-faint">Добавлен {{ student.created_at }}</span>
+    </p>
+  </div>
   {% if user.role != "TEACHER" %}
     <div class="page-actions">
       <a href="{% url 'education:student-edit' student.pk %}" class="btn">Редактировать</a>

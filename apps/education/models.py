@@ -141,6 +141,8 @@ class Schedule(models.Model):
     weekday = models.PositiveSmallIntegerField(choices=Weekday.choices, db_index=True)
     start_time = models.TimeField()
     end_time = models.TimeField()
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -152,6 +154,8 @@ class Schedule(models.Model):
         errors = {}
         if self.start_time and self.end_time and self.start_time >= self.end_time:
             errors["end_time"] = "Время окончания должно быть позже времени начала."
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            errors["end_date"] = "Дата окончания периода не может быть раньше даты начала."
         if self.is_active and self.group_id and self.weekday is not None and self.start_time and self.end_time:
             conflicts = Schedule.objects.filter(group__teacher=self.group.teacher, weekday=self.weekday, is_active=True, start_time__lt=self.end_time, end_time__gt=self.start_time).exclude(pk=self.pk)
             if conflicts.exists():
@@ -176,11 +180,18 @@ class Lesson(models.Model):
     end_time = models.TimeField()
     status = models.CharField(max_length=16, choices=LessonStatus.choices, default=LessonStatus.SCHEDULED, db_index=True)
     schedule = models.ForeignKey(Schedule, on_delete=models.SET_NULL, null=True, blank=True, related_name="lessons")
+    topic = models.CharField(max_length=255, blank=True)
+    teacher_note = models.TextField(blank=True)
+    homework = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ("date", "start_time")
+        constraints = [
+            models.UniqueConstraint(fields=("group", "date", "start_time"), name="unique_lesson_group_date_time"),
+            models.UniqueConstraint(fields=("schedule", "date"), condition=Q(schedule__isnull=False), name="unique_lesson_schedule_date"),
+        ]
 
     def clean(self) -> None:
         errors = {}
@@ -281,6 +292,16 @@ class AuditAction(models.TextChoices):
     STUDENT_CREATE = "STUDENT_CREATE", _("Создание ученика")
     STUDENT_ARCHIVE = "STUDENT_ARCHIVE", _("Архивация ученика")
     STUDENT_RESTORE = "STUDENT_RESTORE", _("Восстановление ученика")
+    LESSON_CREATE = "LESSON_CREATE", _("Создание занятия")
+    LESSON_EDIT = "LESSON_EDIT", _("Изменение занятия")
+    LESSON_CANCEL = "LESSON_CANCEL", _("Отмена занятия")
+    LESSON_COMPLETE = "LESSON_COMPLETE", _("Завершение занятия")
+    LESSON_RESCHEDULE = "LESSON_RESCHEDULE", _("Перенос занятия")
+    LESSON_REPORT = "LESSON_REPORT", _("Отчёт о занятии")
+    SCHEDULE_CREATE = "SCHEDULE_CREATE", _("Создание расписания")
+    SCHEDULE_EDIT = "SCHEDULE_EDIT", _("Изменение расписания")
+    SCHEDULE_DEACTIVATE = "SCHEDULE_DEACTIVATE", _("Деактивация расписания")
+    SCHEDULE_GENERATE = "SCHEDULE_GENERATE", _("Генерация занятий")
 
 
 class AuditLog(models.Model):

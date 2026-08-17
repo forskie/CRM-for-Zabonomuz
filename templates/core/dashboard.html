@@ -2,51 +2,202 @@
 {% block title %}Dashboard — CRM центра{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1 class="page-title">Dashboard</h1>
+  <div class="page-head__main">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-sub">Оперативные показатели центра образования</p>
+  </div>
 </div>
 
 <div class="stat-grid">
-  <div class="stat">
-    <div class="stat__label">Students</div>
-    <div class="stat__value">{{ students_total }}</div>
+  <div class="stat-card">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="user" %}</div>
+    <div class="stat-card__label">Students</div>
+    <div class="stat-card__value">{{ students_total }}</div>
   </div>
-  <div class="stat">
-    <div class="stat__label">Active Students</div>
-    <div class="stat__value">{{ students_active }}</div>
+  <div class="stat-card stat-card--success">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="check-circle" %}</div>
+    <div class="stat-card__label">Active Students</div>
+    <div class="stat-card__value">{{ students_active }}</div>
   </div>
-  <div class="stat">
-    <div class="stat__label">Groups</div>
-    <div class="stat__value">{{ groups_active }}</div>
+  <div class="stat-card">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="graduation" %}</div>
+    <div class="stat-card__label">Groups</div>
+    <div class="stat-card__value">{{ groups_active }}</div>
   </div>
-  <div class="stat">
-    <div class="stat__label">Teachers</div>
-    <div class="stat__value">{{ teachers_count }}</div>
+  <div class="stat-card">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="users" %}</div>
+    <div class="stat-card__label">Teachers</div>
+    <div class="stat-card__value">{{ teachers_count }}</div>
   </div>
 
   {% if user.role != 'TEACHER' %}
-    <div class="stat">
-      <div class="stat__label">Оплачено за {{ period_start|date:"F Y" }}</div>
-      <div class="stat__value text-success">{{ payments_total }} TJS</div>
+    <div class="stat-card stat-card--success">
+      <div class="stat-card__icon">{% include "partials/icon.html" with icon="credit-card" %}</div>
+      <div class="stat-card__label">Оплачено за {{ period_start|date:"F Y" }}</div>
+      <div class="stat-card__value">{{ payments_total }} TJS</div>
     </div>
-    <div class="stat">
-      <div class="stat__label">Платежей за {{ period_start|date:"F Y" }}</div>
-      <div class="stat__value">{{ payments_count }}</div>
+    <div class="stat-card">
+      <div class="stat-card__icon">{% include "partials/icon.html" with icon="inbox" %}</div>
+      <div class="stat-card__label">Платежей за {{ period_start|date:"F Y" }}</div>
+      <div class="stat-card__value">{{ payments_count }}</div>
     </div>
   {% endif %}
 
-  <div class="stat">
-    <div class="stat__label">Присутствовал</div>
-    <div class="stat__value">{{ attendance_present }}</div>
+  <div class="stat-card stat-card--success">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="check-circle" %}</div>
+    <div class="stat-card__label">Присутствовал</div>
+    <div class="stat-card__value">{{ attendance_present }}</div>
   </div>
-  <div class="stat">
-    <div class="stat__label">Пропуски</div>
-    <div class="stat__value">{{ attendance_absent }}</div>
+  <div class="stat-card stat-card--danger">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="x-circle" %}</div>
+    <div class="stat-card__label">Пропуски</div>
+    <div class="stat-card__value">{{ attendance_absent }}</div>
   </div>
-  <div class="stat">
-    <div class="stat__label">Опоздания</div>
-    <div class="stat__value">{{ attendance_late }}</div>
+  <div class="stat-card stat-card--warning">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="clock" %}</div>
+    <div class="stat-card__label">Опоздания</div>
+    <div class="stat-card__value">{{ attendance_late }}</div>
   </div>
 </div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Занятия сегодня</h2>
+    <a href="{% url 'education:calendar' %}?view=day" class="btn btn--sm">Календарь</a>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Время</th>
+            <th>Группа</th>
+            <th>Преподаватель</th>
+            <th>Статус</th>
+            <th>Посещаемость</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lesson in today_lessons %}
+            <tr>
+              <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
+              <td><a href="{% url 'education:lesson-detail' lesson.pk %}"><strong>{{ lesson.group }}</strong></a></td>
+              <td>{{ lesson.group.teacher }}</td>
+              <td><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></td>
+              <td class="mono">{{ lesson.marked }} / {{ lesson.student_count }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="table-empty">Занятий на сегодня нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Ближайшие занятия</h2>
+    <a href="{% url 'education:calendar' %}?view=week" class="btn btn--sm">Неделя</a>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Время</th>
+            <th>Группа</th>
+            <th>Преподаватель</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lesson in upcoming_lessons %}
+            <tr>
+              <td class="mono"><a href="{% url 'education:lesson-detail' lesson.pk %}"><strong>{{ lesson.date }}</strong></a></td>
+              <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
+              <td>{{ lesson.group }}</td>
+              <td>{{ lesson.group.teacher }}</td>
+              <td><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="table-empty">Ближайших занятий нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{% if is_teacher %}
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Ожидают отметки посещаемости</h2>
+    <a href="{% url 'education:calendar' %}" class="btn btn--sm">Календарь</a>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Время</th>
+            <th>Группа</th>
+            <th>Посещаемость</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lesson in attendance_pending %}
+            <tr>
+              <td class="mono"><a href="{% url 'education:lesson-detail' lesson.pk %}"><strong>{{ lesson.date }}</strong></a></td>
+              <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
+              <td>{{ lesson.group }}</td>
+              <td class="mono">{{ lesson.marked }} / {{ lesson.student_count }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="table-empty">Нет занятий, ожидающих отметки.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Прошедшие занятия</h2>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Время</th>
+            <th>Группа</th>
+            <th>Статус</th>
+            <th>Посещаемость</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lesson in recent_lessons %}
+            <tr>
+              <td class="mono"><a href="{% url 'education:lesson-detail' lesson.pk %}"><strong>{{ lesson.date }}</strong></a></td>
+              <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
+              <td>{{ lesson.group }}</td>
+              <td><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></td>
+              <td class="mono">{{ lesson.marked }} / {{ lesson.student_count }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="table-empty">Прошедших занятий нет.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {% if user.role != 'TEACHER' %}
   <section class="panel">

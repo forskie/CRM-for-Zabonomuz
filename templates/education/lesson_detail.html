@@ -2,13 +2,68 @@
 {% block title %}Занятие — CRM центра{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1 class="page-title">Занятие</h1>
+  <div class="page-head__main">
+    <h1 class="page-title">Занятие</h1>
+    <p class="page-sub">
+      <span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span>
+      <span class="text-faint">{{ lesson.date }} {{ lesson.start_time }}–{{ lesson.end_time }}</span>
+    </p>
+  </div>
   {% if user.role != 'TEACHER' %}
     <div class="page-actions">
+      {% if lesson.status != 'CANCELLED' %}
+        <a href="{% url 'education:lesson-reschedule' lesson.pk %}" class="btn">Перенести</a>
+        {% if lesson.status == 'SCHEDULED' %}
+          <form class="inline-form" method="post" action="{% url 'education:lesson-complete' lesson.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn--primary">Завершить занятие</button>
+          </form>
+        {% endif %}
+      {% endif %}
       <a href="{% url 'education:lesson-edit' lesson.pk %}" class="btn">Изменить</a>
+    </div>
+  {% elif lesson.group.teacher.user == user %}
+    <div class="page-actions">
+      {% if lesson.status == 'SCHEDULED' %}
+        <form class="inline-form" method="post" action="{% url 'education:lesson-complete' lesson.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--primary">Завершить занятие</button>
+        </form>
+      {% endif %}
     </div>
   {% endif %}
 </div>
+
+{% if lesson.topic or lesson.teacher_note or lesson.homework %}
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Отчёт о занятии</h2>
+    {% if user.role != 'TEACHER' or lesson.group.teacher.user == user %}
+      <a href="{% url 'education:lesson-report' lesson.pk %}" class="btn btn--sm">Редактировать</a>
+    {% endif %}
+  </div>
+  <div class="panel__body">
+    <dl class="dl">
+      <dt>Тема</dt><dd>{{ lesson.topic|default:"—" }}</dd>
+      <dt>Заметка преподавателя</dt><dd>{{ lesson.teacher_note|default:"—"|linebreaksbr }}</dd>
+      <dt>Домашнее задание</dt><dd>{{ lesson.homework|default:"—"|linebreaksbr }}</dd>
+    </dl>
+  </div>
+</section>
+{% elif user.role != 'TEACHER' or lesson.group.teacher.user == user %}
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Отчёт о занятии</h2>
+    <a href="{% url 'education:lesson-report' lesson.pk %}" class="btn btn--sm">Заполнить</a>
+  </div>
+  <div class="panel__body">
+    <div class="empty-state">
+      <div class="empty-state__icon">{% include "partials/icon.html" with icon="book" %}</div>
+      <div class="empty-state__title">Отчёт ещё не заполнен. Тема, заметка и домашнее задание появятся здесь.</div>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 <div class="panel">
   <div class="panel__body">
@@ -32,8 +87,14 @@
       {% if attendance_form.students %}
         <form method="post" class="form form--wide">
           {% csrf_token %}
-          {{ attendance_form.non_field_errors }}
-          <div class="table-wrap">
+          {% if attendance_form.non_field_errors %}
+            <ul class="errorlist">
+              {% for error in attendance_form.non_field_errors %}
+                <li>{{ error }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+          <div class="table-wrap attendance-table">
             <table class="table">
               <thead>
                 <tr>
@@ -46,7 +107,16 @@
                 {% for student, status_field, note_field in attendance_form.rows %}
                   <tr>
                     <td>{{ student.full_name }}</td>
-                    <td>{{ status_field }}{{ status_field.errors }}</td>
+                    <td>
+                      {{ status_field }}
+                      {% if status_field.errors %}
+                        <ul class="errorlist">
+                          {% for error in status_field.errors %}
+                            <li>{{ error }}</li>
+                          {% endfor %}
+                        </ul>
+                      {% endif %}
+                    </td>
                     <td>{{ note_field }}</td>
                   </tr>
                 {% endfor %}
@@ -60,10 +130,13 @@
           {% endif %}
         </form>
       {% else %}
-        <div class="empty">Нет активных учеников для отметки.</div>
+        <div class="empty-state">
+          <div class="empty-state__icon">{% include "partials/icon.html" with icon="users" %}</div>
+          <div class="empty-state__title">Нет активных учеников для отметки.</div>
+        </div>
       {% endif %}
     {% else %}
-      {% if lesson.attendance_records.all %}
+      {% if attendance_records %}
         <div class="table-wrap">
           <table class="table">
             <thead>
@@ -74,7 +147,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for record in lesson.attendance_records.all %}
+              {% for record in attendance_records %}
                 <tr>
                   <td>{{ record.student }}</td>
                   <td><span class="badge badge--{{ record.status|lower }}">{{ record.get_status_display }}</span></td>
@@ -85,30 +158,33 @@
           </table>
         </div>
       {% else %}
-        <div class="empty">Отметки посещаемости ещё не заполнены.</div>
+        <div class="empty-state">
+          <div class="empty-state__icon">{% include "partials/icon.html" with icon="clock" %}</div>
+          <div class="empty-state__title">Отметки посещаемости ещё не заполнены.</div>
+        </div>
       {% endif %}
     {% endif %}
 
     <div class="stat-grid attendance-summary">
-      <div class="stat">
-        <div class="stat__label">Students</div>
-        <div class="stat__value">{{ summary.total }}</div>
+      <div class="stat-card">
+        <div class="stat-card__label">Students</div>
+        <div class="stat-card__value">{{ summary.total }}</div>
       </div>
-      <div class="stat">
-        <div class="stat__label">Present</div>
-        <div class="stat__value text-success">{{ summary.present }}</div>
+      <div class="stat-card stat-card--success">
+        <div class="stat-card__label">Present</div>
+        <div class="stat-card__value">{{ summary.present }}</div>
       </div>
-      <div class="stat">
-        <div class="stat__label">Absent</div>
-        <div class="stat__value text-danger">{{ summary.absent }}</div>
+      <div class="stat-card stat-card--danger">
+        <div class="stat-card__label">Absent</div>
+        <div class="stat-card__value">{{ summary.absent }}</div>
       </div>
-      <div class="stat">
-        <div class="stat__label">Late</div>
-        <div class="stat__value text-warning">{{ summary.late }}</div>
+      <div class="stat-card stat-card--warning">
+        <div class="stat-card__label">Late</div>
+        <div class="stat-card__value">{{ summary.late }}</div>
       </div>
-      <div class="stat">
-        <div class="stat__label">Not marked</div>
-        <div class="stat__value text-warning">{{ summary.not_marked }}</div>
+      <div class="stat-card stat-card--warning">
+        <div class="stat-card__label">Not marked</div>
+        <div class="stat-card__value">{{ summary.not_marked }}</div>
       </div>
     </div>
   </div>

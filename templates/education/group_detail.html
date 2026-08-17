@@ -2,11 +2,19 @@
 {% block title %}{{ group.name }} — CRM центра{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1 class="page-title">{{ group.name }}</h1>
+  <div class="page-head__main">
+    <h1 class="page-title">{{ group.name }}</h1>
+    <p class="page-sub">
+      <span class="badge badge--{{ group.status|lower }}">{{ group.get_status_display }}</span>
+      {% if user.role != 'TEACHER' %}<span class="text-faint">{{ group.monthly_fee }} TJS / мес.</span>{% endif %}
+    </p>
+  </div>
   {% if user.role != 'TEACHER' %}
     <div class="page-actions">
       <a href="{% url 'education:group-edit' group.pk %}" class="btn">Редактировать</a>
-      <a href="{% url 'education:enrollment-create' group.pk %}" class="btn btn--primary">Добавить ученика</a>
+      <a href="{% url 'education:enrollment-create' group.pk %}" class="btn btn--primary">
+        {% include "partials/icon.html" with icon="plus" %}Добавить ученика
+      </a>
     </div>
   {% endif %}
 </div>
@@ -39,18 +47,22 @@
             <span class="list__main">
               <strong>{{ schedule.get_weekday_display }}</strong>
               <span class="mono text-muted">{{ schedule.start_time }}–{{ schedule.end_time }}</span>
+              {% if schedule.start_date or schedule.end_date %}
+                <span class="mono text-muted">{% if schedule.start_date %}с {{ schedule.start_date }}{% endif %}{% if schedule.end_date %} по {{ schedule.end_date }}{% endif %}</span>
+              {% endif %}
               {% if not schedule.is_active %}<span class="badge badge--archived">Неактивно</span>{% endif %}
             </span>
             {% if user.role != 'TEACHER' %}
               <span class="list__actions">
                 <a href="{% url 'education:schedule-edit' schedule.pk %}" class="btn btn--sm">Изменить</a>
                 {% if schedule.is_active %}
+                  <a href="{% url 'education:schedule-generate' schedule.pk %}" class="btn btn--sm btn--primary">Генерация</a>
                   <form class="inline-form" method="post" action="{% url 'education:schedule-deactivate' schedule.pk %}">
                     {% csrf_token %}
                     <button type="submit" class="btn btn--sm btn--ghost">Деактивировать</button>
                   </form>
                 {% endif %}
-                <a href="{% url 'education:lesson-from-schedule' schedule.pk %}" class="btn btn--sm btn--primary">Создать занятие</a>
+                <a href="{% url 'education:lesson-from-schedule' schedule.pk %}" class="btn btn--sm">Создать занятие</a>
               </span>
             {% endif %}
           </li>
@@ -103,7 +115,7 @@
               <td>{{ enrollment.started_at }}</td>
             </tr>
           {% empty %}
-            <tr><td colspan="3">Нет активных учеников.</td></tr>
+            <tr><td colspan="3" class="table-empty">Нет активных учеников.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -119,13 +131,13 @@
   </div>
   <div class="panel__body">
     <div class="stat-grid">
-      <div class="stat">
-        <div class="stat__label">Платежей</div>
-        <div class="stat__value">{{ payments|length }}</div>
+      <div class="stat-card">
+        <div class="stat-card__label">Платежей</div>
+        <div class="stat-card__value">{{ payments|length }}</div>
       </div>
-      <div class="stat">
-        <div class="stat__label">Оплачено</div>
-        <div class="stat__value text-success">{{ payments_total }} TJS</div>
+      <div class="stat-card stat-card--success">
+        <div class="stat-card__label">Оплачено</div>
+        <div class="stat-card__value">{{ payments_total }} TJS</div>
       </div>
     </div>
   </div>

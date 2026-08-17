@@ -1,5 +1,8 @@
+from collections import defaultdict
+from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
@@ -12,8 +15,9 @@ from apps.accounts.models import UserRole
 from apps.accounts.permissions import operational_required
 
 from .audit import record_audit
-from .forms import AttendanceBulkForm, CourseForm, EnrollmentCreateForm, EnrollmentEndForm, GroupForm, LessonForm, LessonFromScheduleForm, PaymentEditForm, PaymentForm, ScheduleForm, StudentForm, TeacherCreateForm, TeacherForm
+from .forms import AttendanceBulkForm, CourseForm, EnrollmentCreateForm, EnrollmentEndForm, GroupForm, LessonForm, LessonFromScheduleForm, LessonReportForm, LessonRescheduleForm, PaymentEditForm, PaymentForm, ScheduleForm, ScheduleGenerateForm, StudentForm, TeacherCreateForm, TeacherForm
 from .models import Attendance, AttendanceStatus, AuditAction, AuditLog, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, Payment, PaymentStatus, RecordStatus, Schedule, Student, Teacher
+from .services import generate_lessons, preview_lessons
 
 
 def _page(request: HttpRequest, queryset):
@@ -308,6 +312,7 @@ def schedule_create(request: HttpRequest, group_pk: int) -> HttpResponse:
     form = ScheduleForm(request.POST or None, group=group)
     if request.method == "POST" and form.is_valid():
         schedule = form.save()
+        record_audit(request.user, AuditAction.SCHEDULE_CREATE, "Schedule", schedule.pk, f"{schedule.group}: {schedule.get_weekday_display()} {schedule.start_time}–{schedule.end_time}")
         return redirect("education:group-detail", pk=schedule.group_id)
     return render(request, "education/form.html", {"form": form, "title": f"Расписание: {group.name}"})
 
@@ -318,6 +323,7 @@ def schedule_edit(request: HttpRequest, pk: int) -> HttpResponse:
     form = ScheduleForm(request.POST or None, instance=schedule, group=schedule.group)
     if request.method == "POST" and form.is_valid():
         form.save()
+        record_audit(request.user, AuditAction.SCHEDULE_EDIT, "Schedule", schedule.pk, f"{schedule.group}: {schedule.get_weekday_display()} {schedule.start_time}–{schedule.end_time}")
         return redirect("education:group-detail", pk=schedule.group_id)
     return render(request, "education/form.html", {"form": form, "title": "Изменить расписание"})
 
@@ -329,7 +335,31 @@ def schedule_deactivate(request: HttpRequest, pk: int) -> HttpResponse:
     schedule = get_object_or_404(Schedule, pk=pk)
     schedule.is_active = False
     schedule.save(update_fields=("is_active", "updated_at"))
+    record_audit(request.user, AuditAction.SCHEDULE_DEACTIVATE, "Schedule", schedule.pk, f"{schedule.group}: {schedule.get_weekday_display()} {schedule.start_time}–{schedule.end_time}")
     return redirect("education:group-detail", pk=schedule.group_id)
+
+
+@operational_required
+def schedule_generate(request: HttpRequest, schedule_pk: int) -> HttpResponse:
+    schedule = get_object_or_404(Schedule, pk=schedule_pk, is_active=True)
+    initial = {}
+    if schedule.start_date:
+        initial["date_from"] = schedule.start_date
+    if schedule.end_date:
+        initial["date_to"] = schedule.end_date
+    form = ScheduleGenerateForm(request.POST or None, initial=initial or None)
+    preview = None
+    if request.method == "POST" and form.is_valid():
+        date_from = form.cleaned_data["date_from"]
+        date_to = form.cleaned_data["date_to"]
+        if request.POST.get("preview"):
+            preview = preview_lessons(schedule, date_from, date_to)
+        else:
+            result = generate_lessons(schedule, date_from, date_to)
+            record_audit(request.user, AuditAction.SCHEDULE_GENERATE, "Schedule", schedule.pk, f"{schedule.group}: {date_from}–{date_to} — создано {result.created}, пропущено {result.skipped}, конфликтов {result.conflicts}")
+            messages.success(request, f"Создано занятий: {result.created}. Пропущено дубликатов: {result.skipped}. Конфликтов: {result.conflicts}.")
+            return redirect("education:group-detail", pk=schedule.group_id)
+    return render(request, "education/schedule_generate.html", {"form": form, "schedule": schedule, "preview": preview})
 
 
 def _lessons_for_request(request: HttpRequest):
@@ -377,10 +407,21 @@ def lesson_detail(request: HttpRequest, pk: int) -> HttpResponse:
             form.save()
             record_audit(request.user, AuditAction.ATTENDANCE_CHANGE, "Lesson", lesson.pk, f"{lesson.group}: {lesson.date} — отмечено {marked} учеников")
             return redirect("education:lesson-detail", pk=pk)
-    active_count = lesson.active_students().count()
-    records = lesson.attendance_records.all()
-    summary = {"total": active_count, "present": records.filter(status=AttendanceStatus.PRESENT).count(), "absent": records.filter(status=AttendanceStatus.ABSENT).count(), "late": records.filter(status=AttendanceStatus.LATE).count(), "not_marked": max(0, active_count - records.filter(student__in=lesson.active_students()).count())}
-    return render(request, "education/lesson_detail.html", {"lesson": lesson, "attendance_form": form, "summary": summary, "can_edit": can_edit})
+    active_students = list(lesson.active_students())
+    active_ids = {student.pk for student in active_students}
+    records = lesson.attendance_records.select_related("student").all()
+    present = absent = late = marked_active = 0
+    for record in records:
+        if record.status == AttendanceStatus.PRESENT:
+            present += 1
+        elif record.status == AttendanceStatus.ABSENT:
+            absent += 1
+        elif record.status == AttendanceStatus.LATE:
+            late += 1
+        if record.student_id in active_ids:
+            marked_active += 1
+    summary = {"total": len(active_students), "present": present, "absent": absent, "late": late, "not_marked": max(0, len(active_students) - marked_active)}
+    return render(request, "education/lesson_detail.html", {"lesson": lesson, "attendance_form": form, "summary": summary, "can_edit": can_edit, "attendance_records": records})
 
 
 @operational_required
@@ -390,6 +431,7 @@ def lesson_create(request: HttpRequest) -> HttpResponse:
         lesson = form.save(commit=False)
         lesson.full_clean()
         lesson.save()
+        record_audit(request.user, AuditAction.LESSON_CREATE, "Lesson", lesson.pk, f"{lesson.group}: {lesson.date} {lesson.start_time}–{lesson.end_time}")
         return redirect("education:lesson-detail", pk=lesson.pk)
     return render(request, "education/form.html", {"form": form, "title": "Новое занятие"})
 
@@ -402,6 +444,7 @@ def lesson_edit(request: HttpRequest, pk: int) -> HttpResponse:
         updated = form.save(commit=False)
         updated.full_clean()
         updated.save()
+        record_audit(request.user, AuditAction.LESSON_EDIT, "Lesson", lesson.pk, f"{lesson.group}: {lesson.date} {lesson.start_time}–{lesson.end_time}")
         return redirect("education:lesson-detail", pk=pk)
     return render(request, "education/form.html", {"form": form, "title": "Изменить занятие"})
 
@@ -412,6 +455,7 @@ def lesson_from_schedule(request: HttpRequest, schedule_pk: int) -> HttpResponse
     form = LessonFromScheduleForm(request.POST or None, schedule=schedule)
     if request.method == "POST" and form.is_valid():
         lesson = form.save()
+        record_audit(request.user, AuditAction.LESSON_CREATE, "Lesson", lesson.pk, f"{lesson.group}: {lesson.date} {lesson.start_time}–{lesson.end_time}")
         return redirect("education:lesson-detail", pk=lesson.pk)
     return render(request, "education/form.html", {"form": form, "title": f"Занятие из расписания: {schedule}"})
 
@@ -421,10 +465,124 @@ def lesson_set_status(request: HttpRequest, pk: int, status: str) -> HttpRespons
     if request.method != "POST" or status not in LessonStatus.values:
         raise PermissionDenied
     lesson = get_object_or_404(Lesson, pk=pk)
+    previous = lesson.status
     lesson.status = status
     lesson.full_clean()
     lesson.save(update_fields=("status", "updated_at"))
+    if previous != status:
+        action = {LessonStatus.CANCELLED: AuditAction.LESSON_CANCEL, LessonStatus.COMPLETED: AuditAction.LESSON_COMPLETE}.get(status)
+        if action:
+            record_audit(request.user, action, "Lesson", lesson.pk, f"{lesson.group}: {lesson.date} — {lesson.get_status_display()}")
     return redirect("education:lesson-detail", pk=pk)
+
+
+@operational_required
+def lesson_reschedule(request: HttpRequest, pk: int) -> HttpResponse:
+    lesson = get_object_or_404(Lesson, pk=pk)
+    form = LessonRescheduleForm(request.POST or None, lesson=lesson)
+    if request.method == "POST" and form.is_valid():
+        previous = f"{lesson.date} {lesson.start_time}–{lesson.end_time}"
+        lesson.date = form.cleaned_data["date"]
+        lesson.start_time = form.cleaned_data["start_time"]
+        lesson.end_time = form.cleaned_data["end_time"]
+        lesson.full_clean()
+        lesson.save(update_fields=("date", "start_time", "end_time", "updated_at"))
+        record_audit(request.user, AuditAction.LESSON_RESCHEDULE, "Lesson", lesson.pk, f"{lesson.group}: {previous} → {lesson.date} {lesson.start_time}–{lesson.end_time}")
+        return redirect("education:lesson-detail", pk=lesson.pk)
+    return render(request, "education/form.html", {"form": form, "title": f"Перенос занятия: {lesson.group} — {lesson.date}"})
+
+
+@login_required
+def lesson_report(request: HttpRequest, pk: int) -> HttpResponse:
+    lesson = get_object_or_404(_lessons_for_request(request), pk=pk)
+    form = LessonReportForm(request.POST or None, instance=lesson)
+    if request.method == "POST":
+        if lesson.status == LessonStatus.CANCELLED:
+            form.add_error(None, "Нельзя редактировать отчёт отменённого занятия.")
+        elif form.is_valid():
+            form.save()
+            record_audit(request.user, AuditAction.LESSON_REPORT, "Lesson", lesson.pk, f"{lesson.group}: {lesson.date} — тема: {lesson.topic or '—'}")
+            return redirect("education:lesson-detail", pk=lesson.pk)
+    return render(request, "education/form.html", {"form": form, "title": f"Отчёт о занятии: {lesson.group} — {lesson.date}"})
+
+
+@login_required
+def lesson_complete(request: HttpRequest, pk: int) -> HttpResponse:
+    if request.method != "POST":
+        raise PermissionDenied
+    lesson = get_object_or_404(_lessons_for_request(request), pk=pk)
+    if lesson.status != LessonStatus.SCHEDULED:
+        raise PermissionDenied
+    lesson.status = LessonStatus.COMPLETED
+    lesson.full_clean()
+    lesson.save(update_fields=("status", "updated_at"))
+    record_audit(request.user, AuditAction.LESSON_COMPLETE, "Lesson", lesson.pk, f"{lesson.group}: {lesson.date}")
+    return redirect("education:lesson-detail", pk=lesson.pk)
+
+
+@login_required
+def calendar_view(request: HttpRequest) -> HttpResponse:
+    """Day / week / month calendar. TEACHER is always scoped to own groups."""
+    today = timezone.localdate()
+    mode = request.GET.get("view", "week")
+    if mode not in ("day", "week", "month"):
+        mode = "week"
+    anchor = _parse_date(request.GET.get("date")) or today
+
+    lessons = (
+        Lesson.objects.select_related("group__course", "group__teacher__user", "schedule")
+        .annotate(active_count=Count("group__enrollments", filter=Q(group__enrollments__status=EnrollmentStatus.ACTIVE), distinct=True))
+    )
+    if _is_teacher(request):
+        lessons = lessons.filter(group__teacher=request.user.teacher_profile)
+    else:
+        group_id = request.GET.get("group")
+        if group_id and group_id.isdigit():
+            lessons = lessons.filter(group_id=group_id)
+        teacher_id = request.GET.get("teacher")
+        if teacher_id and teacher_id.isdigit():
+            lessons = lessons.filter(group__teacher_id=teacher_id)
+
+    if mode == "day":
+        start = end = anchor
+    elif mode == "month":
+        start = anchor.replace(day=1)
+        end = (start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        start = start - timedelta(days=start.weekday())
+        end = end + timedelta(days=(6 - end.weekday()))
+    else:
+        start = anchor - timedelta(days=anchor.weekday())
+        end = start + timedelta(days=6)
+
+    lessons = lessons.filter(date__gte=start, date__lte=end).order_by("date", "start_time")
+    lessons_by_day = defaultdict(list)
+    for lesson in lessons:
+        lessons_by_day[lesson.date].append(lesson)
+
+    days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+
+    if mode == "day":
+        prev_date, next_date = anchor - timedelta(days=1), anchor + timedelta(days=1)
+    elif mode == "week":
+        prev_date, next_date = anchor - timedelta(days=7), anchor + timedelta(days=7)
+    else:
+        prev_date = (anchor.replace(day=1) - timedelta(days=1)).replace(day=1)
+        next_date = (anchor.replace(day=1) + timedelta(days=32)).replace(day=1)
+
+    return render(request, "education/calendar.html", {
+        "view_mode": mode,
+        "anchor": anchor,
+        "days": days,
+        "lessons_by_day": lessons_by_day,
+        "today": today,
+        "prev_date": prev_date,
+        "next_date": next_date,
+        "is_teacher": _is_teacher(request),
+        "groups": Group.objects.select_related("course").order_by("name") if not _is_teacher(request) else [],
+        "teachers": Teacher.objects.select_related("user").order_by("pk") if not _is_teacher(request) else [],
+        "selected_group": request.GET.get("group", ""),
+        "selected_teacher": request.GET.get("teacher", ""),
+    })
 
 
 def _payment_queryset():
@@ -504,9 +662,11 @@ def payment_cancel(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         raise PermissionDenied
     payment = get_object_or_404(Payment, pk=pk)
+    previous = payment.status
     payment.status = PaymentStatus.CANCELLED
     payment.save(update_fields=("status", "updated_at"))
-    record_audit(request.user, AuditAction.PAYMENT_CANCEL, "Payment", payment.pk, f"{payment.student}: {payment.amount} ({payment.period:%m.%Y})")
+    if previous != payment.status:
+        record_audit(request.user, AuditAction.PAYMENT_CANCEL, "Payment", payment.pk, f"{payment.student}: {payment.amount} ({payment.period:%m.%Y})")
     return redirect("education:payment-detail", pk=pk)
 
 

@@ -1,12 +1,12 @@
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.shortcuts import render
 from django.utils import timezone
 
 from apps.accounts.models import UserRole
-from apps.education.models import Attendance, AttendanceStatus, EnrollmentStatus, Group, Payment, PaymentStatus, RecordStatus, Student, Teacher
+from apps.education.models import Attendance, AttendanceStatus, EnrollmentStatus, Group, Lesson, LessonStatus, Payment, PaymentStatus, RecordStatus, Student, Teacher
 
 
 def _is_teacher(request) -> bool:
@@ -58,6 +58,38 @@ def dashboard(request):
         .order_by("name")
     )
 
+    lesson_qs = Lesson.objects.select_related("group__course", "group__teacher__user")
+    if _is_teacher(request):
+        lesson_qs = lesson_qs.filter(group__teacher=request.user.teacher_profile)
+    today_lessons = (
+        lesson_qs.filter(date=today)
+        .annotate(marked=Count("attendance_records", distinct=True))
+        .annotate(student_count=Count("group__enrollments", filter=Q(group__enrollments__status=EnrollmentStatus.ACTIVE), distinct=True))
+        .order_by("start_time")[:10]
+    )
+    upcoming_lessons = (
+        lesson_qs.filter(date__gte=today)
+        .exclude(status=LessonStatus.CANCELLED)
+        .order_by("date", "start_time")[:10]
+    )
+
+    attendance_pending = []
+    recent_lessons = []
+    if _is_teacher(request):
+        attendance_pending = list(
+            lesson_qs.filter(date__gte=today, status=LessonStatus.SCHEDULED)
+            .annotate(marked=Count("attendance_records", distinct=True))
+            .annotate(student_count=Count("group__enrollments", filter=Q(group__enrollments__status=EnrollmentStatus.ACTIVE), distinct=True))
+            .filter(marked__lt=F("student_count"))
+            .order_by("date", "start_time")[:10]
+        )
+        recent_lessons = (
+            lesson_qs.filter(date__lt=today)
+            .annotate(marked=Count("attendance_records", distinct=True))
+            .annotate(student_count=Count("group__enrollments", filter=Q(group__enrollments__status=EnrollmentStatus.ACTIVE), distinct=True))
+            .order_by("-date", "start_time")[:10]
+        )
+
     context = {
         "students_total": students["total"],
         "students_active": students["active"],
@@ -72,5 +104,10 @@ def dashboard(request):
         "recent_payments": recent_payments,
         "recent_attendance": attendance_qs.select_related("student", "lesson__group").order_by("-lesson__date", "-pk")[:10],
         "active_groups": active_groups,
+        "today_lessons": today_lessons,
+        "upcoming_lessons": upcoming_lessons,
+        "attendance_pending": attendance_pending,
+        "recent_lessons": recent_lessons,
+        "is_teacher": _is_teacher(request),
     }
     return render(request, "core/dashboard.html", context)

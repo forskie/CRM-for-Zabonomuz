@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load education_extras %}
+{% block title %}Календарь — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head__main">
+    <h1 class="page-title">Календарь занятий</h1>
+    <p class="page-sub">{{ anchor|date:"l, d.m.Y" }}</p>
+  </div>
+  <div class="page-actions">
+    <div class="segmented">
+      <a class="segmented__item {% if view_mode == 'day' %}active{% endif %}" href="?view=day{% if selected_group %}&amp;group={{ selected_group }}{% endif %}{% if selected_teacher %}&amp;teacher={{ selected_teacher }}{% endif %}">День</a>
+      <a class="segmented__item {% if view_mode == 'week' %}active{% endif %}" href="?view=week{% if selected_group %}&amp;group={{ selected_group }}{% endif %}{% if selected_teacher %}&amp;teacher={{ selected_teacher }}{% endif %}">Неделя</a>
+      <a class="segmented__item {% if view_mode == 'month' %}active{% endif %}" href="?view=month{% if selected_group %}&amp;group={{ selected_group }}{% endif %}{% if selected_teacher %}&amp;teacher={{ selected_teacher }}{% endif %}">Месяц</a>
+    </div>
+    <a class="btn" href="?{% if view_mode %}view={{ view_mode }}{% endif %}{% if selected_group %}&amp;group={{ selected_group }}{% endif %}{% if selected_teacher %}&amp;teacher={{ selected_teacher }}{% endif %}">Сегодня</a>
+  </div>
+</div>
+
+{% if not is_teacher %}
+<form method="get" class="toolbar toolbar--filters">
+  <input type="hidden" name="view" value="{{ view_mode }}">
+  <input type="hidden" name="date" value="{{ anchor|date:'Y-m-d' }}">
+  <select name="group">
+    <option value="">Все группы</option>
+    {% for group in groups %}
+      <option value="{{ group.pk }}" {% if selected_group == group.pk|stringformat:"s" %}selected{% endif %}>{{ group.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="teacher">
+    <option value="">Все преподаватели</option>
+    {% for teacher in teachers %}
+      <option value="{{ teacher.pk }}" {% if selected_teacher == teacher.pk|stringformat:"s" %}selected{% endif %}>{{ teacher }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn">Фильтровать</button>
+</form>
+{% endif %}
+
+<div class="calendar-nav">
+  <a class="btn btn--ghost" href="?{% if view_mode %}view={{ view_mode }}&amp;{% endif %}date={{ prev_date|date:'Y-m-d' }}{% if selected_group %}&amp;group={{ selected_group }}{% endif %}{% if selected_teacher %}&amp;teacher={{ selected_teacher }}{% endif %}">
+    {% include "partials/icon.html" with icon="arrow-left" %}Назад
+  </a>
+  <span class="calendar-nav__title">
+    {% if view_mode == 'day' %}{{ anchor|date:"d.m.Y" }}
+    {% elif view_mode == 'week' %}{{ days.0|date:"d.m" }} – {{ days|last|date:"d.m.Y" }}
+    {% else %}{{ anchor|date:"F Y" }}{% endif %}
+  </span>
+  <a class="btn btn--ghost" href="?{% if view_mode %}view={{ view_mode }}&amp;{% endif %}date={{ next_date|date:'Y-m-d' }}{% if selected_group %}&amp;group={{ selected_group }}{% endif %}{% if selected_teacher %}&amp;teacher={{ selected_teacher }}{% endif %}">
+    Вперёд{% include "partials/icon.html" with icon="arrow-right" %}
+  </a>
+</div>
+
+{% if view_mode == 'day' %}
+  <div class="panel">
+    <div class="panel__body panel__body--tight">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Время</th>
+            <th>Группа</th>
+            <th>Преподаватель</th>
+            <th>Статус</th>
+            <th>Посещаемость</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lesson in lessons_by_day|get_item:anchor %}
+            <tr>
+              <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
+              <td><a href="{% url 'education:lesson-detail' lesson.pk %}" class="mono"><strong>{{ lesson.group }}</strong></a></td>
+              <td>{{ lesson.group.teacher }}</td>
+              <td><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></td>
+              <td class="mono">{{ lesson.active_count }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5">
+                <div class="empty-state">
+                  <div class="empty-state__icon">{% include "partials/icon.html" with icon="calendar" %}</div>
+                  <div class="empty-state__title">Занятий в этот день нет.</div>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% elif view_mode == 'week' %}
+  <div class="calendar-grid calendar-grid--week">
+    {% for day in days %}
+      <div class="calendar-day {% if day == today %}calendar-day--today{% endif %}">
+        <div class="calendar-day__head">
+          <a href="?view=day&amp;date={{ day|date:'Y-m-d' }}{% if selected_group %}&amp;group={{ selected_group }}{% endif %}{% if selected_teacher %}&amp;teacher={{ selected_teacher }}{% endif %}" class="calendar-day__date">
+            {{ day|date:"l" }}<br><strong>{{ day|date:"d.m" }}</strong>
+          </a>
+        </div>
+        <div class="calendar-day__body">
+          {% for lesson in lessons_by_day|get_item:day %}
+            <a href="{% url 'education:lesson-detail' lesson.pk %}" class="cal-lesson cal-lesson--{{ lesson.status|lower }}">
+              <span class="cal-lesson__time">{{ lesson.start_time|time:"H:i" }}</span>
+              <span class="cal-lesson__name">{{ lesson.group }}</span>
+            </a>
+          {% empty %}
+            <span class="calendar-day__empty">Нет занятий</span>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="calendar-grid calendar-grid--month">
+    {% for day in days %}
+      <div class="calendar-day {% if day == today %}calendar-day--today{% endif %} {% if day.month != anchor.month %}calendar-day--muted{% endif %}">
+        <div class="calendar-day__head">
+          <a href="?view=day&amp;date={{ day|date:'Y-m-d' }}{% if selected_group %}&amp;group={{ selected_group }}{% endif %}{% if selected_teacher %}&amp;teacher={{ selected_teacher }}{% endif %}" class="calendar-day__date">
+            <strong>{{ day|date:"j" }}</strong>
+          </a>
+        </div>
+        <div class="calendar-day__body">
+          {% for lesson in lessons_by_day|get_item:day %}
+            <a href="{% url 'education:lesson-detail' lesson.pk %}" class="cal-lesson cal-lesson--{{ lesson.status|lower }}">
+              <span class="cal-lesson__time">{{ lesson.start_time|time:"H:i" }}</span>
+              <span class="cal-lesson__name">{{ lesson.group }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

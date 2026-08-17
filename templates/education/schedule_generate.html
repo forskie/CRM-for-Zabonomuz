@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Генерация занятий — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head__main">
+    <h1 class="page-title">Генерация занятий</h1>
+    <p class="page-sub">
+      {{ schedule.group }} — {{ schedule.get_weekday_display }}
+      <span class="mono text-muted">{{ schedule.start_time }}–{{ schedule.end_time }}</span>
+      {% if schedule.start_date %}<span class="mono text-muted">с {{ schedule.start_date }}</span>{% endif %}
+      {% if schedule.end_date %}<span class="mono text-muted">по {{ schedule.end_date }}</span>{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'education:group-detail' schedule.group_id %}" class="btn">Назад к группе</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel__body">
+    <form method="post" class="form">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <ul class="errorlist">
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% for field in form.visible_fields %}
+        <div class="form-group {% if field.errors %}has-error{% endif %}">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}
+            <ul class="errorlist">
+              {% for error in field.errors %}
+                <li>{{ error }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endfor %}
+      <div class="form-actions">
+        <button type="submit" name="preview" value="1" class="btn">Предпросмотр</button>
+        <button type="submit" class="btn btn--primary">Создать занятия</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if preview %}
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Предпросмотр</h2>
+  </div>
+  <div class="panel__body">
+    <div class="stat-grid">
+      <div class="stat-card stat-card--success">
+        <div class="stat-card__label">Будет создано</div>
+        <div class="stat-card__value">{{ preview.created }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">Пропущено (дубликаты)</div>
+        <div class="stat-card__value">{{ preview.skipped }}</div>
+      </div>
+      <div class="stat-card stat-card--warning">
+        <div class="stat-card__label">Конфликты</div>
+        <div class="stat-card__value">{{ preview.conflicts }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">Всего дат в периоде</div>
+        <div class="stat-card__value">{{ preview.total }}</div>
+      </div>
+    </div>
+    <p class="form-help">
+      Генерация идемпотентна: повторный запуск для тех же дат ничего не создаст.
+      Занятия, пересекающиеся с уже существующими у преподавателя, будут пропущены.
+    </p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

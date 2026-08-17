@@ -1,15 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Ошибка сервера — CRM центра{% endblock %}
 {% block content %}
-<div class="page-head">
-  <h1 class="page-title">500 — Ошибка сервера</h1>
-</div>
-<div class="panel">
-  <div class="panel__body">
-    <p>Произошла непредвиденная ошибка. Пожалуйста, попробуйте ещё раз или обратитесь к администратору.</p>
-    <div class="form-actions">
-      <a href="{% url 'dashboard' %}" class="btn btn--primary">На главную</a>
-    </div>
+<div class="error-page">
+  <div class="error-page__code">500</div>
+  <h1 class="error-page__title">Ошибка сервера</h1>
+  <p class="error-page__text">Произошла непредвиденная ошибка. Пожалуйста, попробуйте ещё раз или обратитесь к администратору.</p>
+  <div class="page-actions" style="justify-content:center">
+    <a href="{% url 'dashboard' %}" class="btn btn--primary">На главную</a>
   </div>
 </div>
 {% endblock %}

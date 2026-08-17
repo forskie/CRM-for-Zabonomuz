@@ -5,9 +5,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}CRM центра{% endblock %}</title>
+  <script>
+    (function () {
+      var t = document.documentElement;
+      var saved = null;
+      try { saved = localStorage.getItem('crm-theme'); } catch (e) {}
+      var dark = saved === 'dark' || (saved === null && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      t.setAttribute('data-theme', dark ? 'dark' : 'light');
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/crm.css' %}">
 </head>
 <body>
@@ -16,64 +25,141 @@
 {% url 'education:teacher-list' as teachers_url %}
 {% url 'education:course-list' as courses_url %}
 {% url 'education:group-list' as groups_url %}
+{% url 'education:calendar' as calendar_url %}
 {% url 'education:lesson-list' as lessons_url %}
 {% url 'education:payment-list' as payments_url %}
 {% url 'education:audit-list' as audit_url %}
 {% url 'accounts:user-list' as users_url %}
-<div class="crm-shell">
-  {% if user.is_authenticated %}
-  <aside class="sidebar">
-    <a class="sidebar__brand" href="{% url 'dashboard' %}">CRM <span>центра</span></a>
+{% url 'accounts:logout' as logout_url %}
 
-    <nav class="sidebar__nav" aria-label="Основная навигация">
-      <span class="sidebar__nav-label">Меню</span>
-      <a class="sidebar__link {% if request.path == dashboard_url %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
-      <a class="sidebar__link {% if request.path == students_url %}active{% endif %}" href="{% url 'education:student-list' %}">Students</a>
-      <a class="sidebar__link {% if request.path == teachers_url %}active{% endif %}" href="{% url 'education:teacher-list' %}">Teachers</a>
-      <a class="sidebar__link {% if request.path == courses_url %}active{% endif %}" href="{% url 'education:course-list' %}">Courses</a>
-      <a class="sidebar__link {% if request.path == groups_url %}active{% endif %}" href="{% url 'education:group-list' %}">Groups</a>
-      <a class="sidebar__link {% if request.path == groups_url %}active{% endif %}" href="{% url 'education:group-list' %}">Schedule</a>
-      <a class="sidebar__link {% if request.path == lessons_url %}active{% endif %}" href="{% url 'education:lesson-list' %}">Lessons</a>
+<header class="topbar">
+  <div class="topbar__left">
+    {% if user.is_authenticated %}
+    <button type="button" class="icon-btn sidebar-toggle" id="sidebar-toggle" aria-label="Открыть меню" aria-controls="sidebar">
+      {% include "partials/icon.html" with icon="menu" %}
+    </button>
+    {% endif %}
+    <a class="brand" href="{{ dashboard_url }}">
+      <span class="brand__logo">{% include "partials/icon.html" with icon="logo" %}</span>
+      CRM <span>центра</span>
+    </a>
+  </div>
+  <div class="topbar__right">
+    <button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Переключить тему">
+      <span class="theme-toggle__sun">{% include "partials/icon.html" with icon="sun" %}</span>
+      <span class="theme-toggle__moon">{% include "partials/icon.html" with icon="moon" %}</span>
+    </button>
+    {% if user.is_authenticated %}
+    <div class="user-chip">
+      <span class="user-chip__name">{{ user.get_full_name|default:user.username }}</span>
+      {% if user.role %}
+        <span class="user-chip__role">{{ user.get_role_display|default:user.role }}</span>
+      {% endif %}
+    </div>
+    <form method="post" action="{{ logout_url }}" class="inline-form">
+      {% csrf_token %}
+      <button type="submit" class="btn btn--ghost btn--sm">Выйти</button>
+    </form>
+    {% endif %}
+  </div>
+</header>
+
+{% if user.is_authenticated %}
+<div class="app-body">
+  <aside class="sidebar" id="sidebar" aria-label="Основная навигация">
+    <nav class="sidebar__nav">
+      <div class="sidebar__group">
+        <span class="sidebar__label">Модули</span>
+        <a class="nav-link {% if request.path == dashboard_url %}active{% endif %}" href="{{ dashboard_url }}">
+          {% include "partials/icon.html" with icon="dashboard" %}Dashboard
+        </a>
+        <a class="nav-link {% if students_url in request.path %}active{% endif %}" href="{{ students_url }}">
+          {% include "partials/icon.html" with icon="user" %}Students
+        </a>
+        <a class="nav-link {% if teachers_url in request.path %}active{% endif %}" href="{{ teachers_url }}">
+          {% include "partials/icon.html" with icon="users" %}Teachers
+        </a>
+        <a class="nav-link {% if courses_url in request.path %}active{% endif %}" href="{{ courses_url }}">
+          {% include "partials/icon.html" with icon="book" %}Courses
+        </a>
+        <a class="nav-link {% if groups_url in request.path %}active{% endif %}" href="{{ groups_url }}">
+          {% include "partials/icon.html" with icon="graduation" %}Groups
+        </a>
+        <a class="nav-link {% if calendar_url in request.path %}active{% endif %}" href="{{ calendar_url }}">
+          {% include "partials/icon.html" with icon="calendar" %}Calendar
+        </a>
+        <a class="nav-link {% if lessons_url in request.path %}active{% endif %}" href="{{ lessons_url }}">
+          {% include "partials/icon.html" with icon="hash" %}Lessons
+        </a>
+      </div>
 
       {% if user.role != 'TEACHER' %}
-        <a class="sidebar__link {% if request.path == payments_url %}active{% endif %}" href="{% url 'education:payment-list' %}">Payments</a>
-        <a class="sidebar__link {% if request.path == audit_url %}active{% endif %}" href="{% url 'education:audit-list' %}">Audit</a>
+      <div class="sidebar__group">
+        <span class="sidebar__label">Финансы и контроль</span>
+        <a class="nav-link {% if payments_url in request.path %}active{% endif %}" href="{{ payments_url }}">
+          {% include "partials/icon.html" with icon="credit-card" %}Payments
+        </a>
+        <a class="nav-link {% if audit_url in request.path %}active{% endif %}" href="{{ audit_url }}">
+          {% include "partials/icon.html" with icon="shield" %}Audit
+        </a>
+      </div>
       {% endif %}
 
       {% if user.is_owner %}
-        <span class="sidebar__nav-label">Администрирование</span>
-        <a class="sidebar__link {% if request.path == users_url %}active{% endif %}" href="{% url 'accounts:user-list' %}">Users</a>
+      <div class="sidebar__group">
+        <span class="sidebar__label">Администрирование</span>
+        <a class="nav-link {% if users_url in request.path %}active{% endif %}" href="{{ users_url }}">
+          {% include "partials/icon.html" with icon="sliders" %}Users
+        </a>
+      </div>
       {% endif %}
     </nav>
-
-    <div class="sidebar__user">
-      <span class="sidebar__user-name">{{ user.get_full_name|default:user.username }}</span>
-      {% if user.role %}
-        <span class="sidebar__user-role">{{ user.get_role_display|default:user.role }}</span>
-      {% endif %}
-      <form method="post" action="{% url 'accounts:logout' %}" class="sidebar__logout">
-        {% csrf_token %}
-        <button type="submit" class="btn btn--ghost btn--sm btn--block">Выйти</button>
-      </form>
-    </div>
   </aside>
-  {% endif %}
 
-  <div class="crm-main">
-    <header class="topbar">{% block topbar %}{% endblock %}</header>
+  <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+{% endif %}
 
-    <main class="content">
-      {% if messages %}
-        <div class="messages">
-          {% for message in messages %}
-            <div class="alert alert--{{ message.tags }}">{{ message }}</div>
-          {% endfor %}
-        </div>
-      {% endif %}
+  <main class="content">
+    {% if messages %}
+      <div class="messages">
+        {% for message in messages %}
+          <div class="alert alert--{{ message.tags|default:'info' }}" role="alert">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
 
-      {% block content %}{% endblock %}
-    </main>
-  </div>
+    {% block content %}{% endblock %}
+  </main>
+
+{% if user.is_authenticated %}
 </div>
+{% endif %}
+
+<script>
+  (function () {
+    var toggle = document.getElementById('theme-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        var root = document.documentElement;
+        var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        try { localStorage.setItem('crm-theme', next); } catch (e) {}
+      });
+    }
+
+    var open = document.getElementById('sidebar-toggle');
+    var backdrop = document.getElementById('sidebar-backdrop');
+    if (open && backdrop) {
+      open.addEventListener('click', function () {
+        document.body.classList.toggle('sidebar-open');
+        backdrop.hidden = !document.body.classList.contains('sidebar-open');
+      });
+      backdrop.addEventListener('click', function () {
+        document.body.classList.remove('sidebar-open');
+        backdrop.hidden = true;
+      });
+    }
+  })();
+</script>
 </body>
 </html>

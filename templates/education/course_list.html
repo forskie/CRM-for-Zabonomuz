@@ -2,17 +2,25 @@
 {% block title %}Курсы — CRM центра{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1 class="page-title">Курсы</h1>
+  <div class="page-head__main">
+    <h1 class="page-title">Курсы</h1>
+    <p class="page-sub">Каталог учебных программ центра</p>
+  </div>
   {% if user.role != "TEACHER" %}
     <div class="page-actions">
-      <a href="{% url 'education:course-create' %}" class="btn btn--primary">Добавить курс</a>
+      <a href="{% url 'education:course-create' %}" class="btn btn--primary">
+        {% include "partials/icon.html" with icon="plus" %}Добавить курс
+      </a>
     </div>
   {% endif %}
 </div>
 
 {% if user.role != "TEACHER" %}
 <form method="get" class="toolbar toolbar--filters">
-  <input name="q" value="{{ request.GET.q }}" placeholder="Название курса">
+  <div class="toolbar__search">
+    {% include "partials/icon.html" with icon="search" %}
+    <input name="q" value="{{ request.GET.q }}" placeholder="Название курса">
+  </div>
   <select name="status">
     <option value="">Все статусы</option>
     {% for value, label in statuses.choices %}
@@ -65,12 +73,13 @@
           {% empty %}
             <tr>
               <td colspan="4">
-                <div class="empty">
+                <div class="empty-state">
+                  <div class="empty-state__icon">{% include "partials/icon.html" with icon="book" %}</div>
                   {% if has_filters %}
-                    <div class="empty__title">По заданным фильтрам ничего не найдено.</div>
+                    <div class="empty-state__title">По заданным фильтрам ничего не найдено.</div>
                   {% else %}
-                    <div class="empty__title">Ничего не найдено.</div>
-                    {% if user.role != "TEACHER" %}Добавьте первый курс кнопкой выше.{% endif %}
+                    <div class="empty-state__title">Ничего не найдено.</div>
+                    {% if user.role != "TEACHER" %}<div class="empty-state__text">Добавьте первый курс кнопкой выше.</div>{% endif %}
                   {% endif %}
                 </div>
               </td>
@@ -85,11 +94,16 @@
 {% if page_obj.has_other_pages %}
   <nav class="pagination" aria-label="Пагинация">
     {% if page_obj.has_previous %}
-      <a href="?{% if pagination_qs %}{{ pagination_qs }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">&larr; Назад</a>
+      <a class="page-link" href="?{% if pagination_qs %}{{ pagination_qs }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">
+        {% include "partials/icon.html" with icon="arrow-left" %}
+      </a>
     {% endif %}
-    <span class="current">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+    <span class="page-link page-link--current">{{ page_obj.number }}</span>
+    <span class="page-link page-link--disabled">/ {{ page_obj.paginator.num_pages }}</span>
     {% if page_obj.has_next %}
-      <a href="?{% if pagination_qs %}{{ pagination_qs }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Вперёд &rarr;</a>
+      <a class="page-link" href="?{% if pagination_qs %}{{ pagination_qs }}&amp;{% endif %}page={{ page_obj.next_page_number }}">
+        {% include "partials/icon.html" with icon="arrow-right" %}
+      </a>
     {% endif %}
   </nav>
 {% endif %}

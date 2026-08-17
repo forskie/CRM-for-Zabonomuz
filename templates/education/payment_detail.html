@@ -2,7 +2,13 @@
 {% block title %}Оплата — CRM центра{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1 class="page-title">Оплата</h1>
+  <div class="page-head__main">
+    <h1 class="page-title">Оплата</h1>
+    <p class="page-sub">
+      <span class="badge badge--{{ payment.status|lower }}">{{ payment.get_status_display }}</span>
+      <span class="text-faint">{{ payment.paid_at }}</span>
+    </p>
+  </div>
   <div class="page-actions">
     <a href="{% url 'education:payment-edit' payment.pk %}" class="btn">Изменить</a>
     {% if payment.status == 'PAID' %}
@@ -21,7 +27,7 @@
       <dt>Группа</dt><dd><a href="{% url 'education:group-detail' payment.group_id %}">{{ payment.group }}</a></dd>
       <dt>Дата оплаты</dt><dd class="mono">{{ payment.paid_at }}</dd>
       <dt>Период</dt><dd class="mono">{{ payment.period|date:"F Y" }}</dd>
-      <dt>Сумма</dt><dd class="mono">{{ payment.amount }} TJS</dd>
+      <dt>Сумма</dt><dd class="amount">{{ payment.amount }} TJS</dd>
       <dt>Статус</dt><dd><span class="badge badge--{{ payment.status|lower }}">{{ payment.get_status_display }}</span></dd>
       {% if payment.note %}<dt>Заметка</dt><dd>{{ payment.note }}</dd>{% endif %}
     </dl>

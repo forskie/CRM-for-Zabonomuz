@@ -2,9 +2,14 @@
 {% block title %}Пользователи — CRM центра{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1 class="page-title">Пользователи</h1>
+  <div class="page-head__main">
+    <h1 class="page-title">Пользователи</h1>
+    <p class="page-sub">Учётные записи сотрудников центра</p>
+  </div>
   <div class="page-actions">
-    <a href="{% url 'accounts:user-create' %}" class="btn btn--primary">Создать пользователя</a>
+    <a href="{% url 'accounts:user-create' %}" class="btn btn--primary">
+      {% include "partials/icon.html" with icon="plus" %}Создать пользователя
+    </a>
   </div>
 </div>
 
@@ -43,9 +48,10 @@
           {% empty %}
             <tr>
               <td colspan="4">
-                <div class="empty">
-                  <div class="empty__title">Пользователей нет</div>
-                  Создайте первого пользователя кнопкой выше.
+                <div class="empty-state">
+                  <div class="empty-state__icon">{% include "partials/icon.html" with icon="user" %}</div>
+                  <div class="empty-state__title">Пользователей нет</div>
+                  <div class="empty-state__text">Создайте первого пользователя кнопкой выше.</div>
                 </div>
               </td>
             </tr>
