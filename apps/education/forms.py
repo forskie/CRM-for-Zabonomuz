@@ -83,6 +83,9 @@ class GroupForm(forms.ModelForm):
         fields = ("name", "course", "teacher", "monthly_fee")
         labels = {"name": "Название", "course": "Курс", "teacher": "Преподаватель", "monthly_fee": "Стоимость в месяц (TJS)"}
 
+    class Media:
+        js = ("js/group_form.js",)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         courses = Course.objects.filter(status="ACTIVE")
@@ -92,6 +95,9 @@ class GroupForm(forms.ModelForm):
             teachers = Teacher.objects.filter(Q(status="ACTIVE") | Q(pk=self.instance.teacher_id))
         self.fields["course"].queryset = courses
         self.fields["teacher"].queryset = teachers
+        if not self.instance.pk:
+            fee_choices = {str(c.pk): str(c.default_monthly_fee) for c in courses}
+            self.fields["course"].widget.attrs["data-fee-choices"] = ",".join(f"{k}:{v}" for k, v in fee_choices.items())
 
 
 class EnrollmentCreateForm(forms.ModelForm):

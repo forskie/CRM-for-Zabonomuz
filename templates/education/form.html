@@ -11,6 +11,7 @@
   <div class="panel__body">
     <form method="post" class="form">
       {% csrf_token %}
+      {{ form.media }}
       {% if form.non_field_errors %}
         <ul class="errorlist">
           {% for error in form.non_field_errors %}

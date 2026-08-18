@@ -88,7 +88,7 @@ class E2EOwnerWorkflow(E2EBase):
         # 3. Course
         response = self.client.post(reverse("education:course-create"), {"name": "Math", "description": "", "default_monthly_fee": "250.00"})
         course = Course.objects.get(name="Math")
-        self.assertRedirects(response, reverse("education:course-list"))
+        self.assertRedirects(response, reverse("education:course-detail", args=[course.pk]))
         self.assertEqual(course.default_monthly_fee, Decimal("250.00"))
 
         # 4. Group
@@ -251,7 +251,7 @@ class E2ETeacherWorkflow(E2EBase):
         self.assertEqual(self.client.get(reverse("education:student-detail", args=[self.student_a.pk])).status_code, 200)
         response = self.client.get(reverse("education:lesson-detail", args=[self.lesson_a.pk]))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["can_edit"], False)
+        self.assertEqual(response.context["can_edit"], True)
         self.assertEqual(list(response.context["lesson"].attendance_records.all()), [self.attendance_a])
 
     def test_teacher_cannot_see_foreign_data_by_url(self):
@@ -456,15 +456,16 @@ class E2EAttendanceLifecycle(E2EBase):
         self.assertEqual(response.context["attendance_present"], 1)
         self.assertEqual(response.context["attendance_late"], 1)
 
-    def test_teacher_cannot_mark_attendance_but_can_view(self):
+    def test_teacher_can_mark_attendance_on_own_lesson(self):
         self.login(self.teacher_a_user)
         response = self.client.post(reverse("education:lesson-detail", args=[self.lesson_a.pk]), {
             f"status_{self.student_a.pk}": AttendanceStatus.PRESENT,
         })
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(Attendance.objects.filter(lesson=self.lesson_a).count(), 1)
+        self.assertRedirects(response, reverse("education:lesson-detail", args=[self.lesson_a.pk]))
+        self.assertEqual(Attendance.objects.filter(lesson=self.lesson_a, student=self.student_a).count(), 1)
+        self.assertEqual(Attendance.objects.get(lesson=self.lesson_a, student=self.student_a).status, AttendanceStatus.PRESENT)
         response = self.client.get(reverse("education:lesson-detail", args=[self.lesson_a.pk]))
-        self.assertEqual(response.context["can_edit"], False)
+        self.assertEqual(response.context["can_edit"], True)
 
     def test_cancelled_lesson_attendance_is_immutable(self):
         self._mark([(self.student_a, AttendanceStatus.PRESENT)])

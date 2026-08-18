@@ -86,7 +86,7 @@ class CourseTests(OperationalBaseTestCase):
         self.client.force_login(self.admin)
         response = self.client.post(reverse("education:course-create"), {"name": "English", "description": "A1", "default_monthly_fee": "300.00"})
         course = Course.objects.get(name="English")
-        self.assertRedirects(response, reverse("education:course-list"))
+        self.assertRedirects(response, reverse("education:course-detail", args=[course.pk]))
         self.assertEqual(course.default_monthly_fee, Decimal("300.00"))
         self.client.post(reverse("education:course-edit", args=[course.pk]), {"name": "English A1", "description": "", "default_monthly_fee": "350"})
         self.client.post(reverse("education:course-status", args=[course.pk, RecordStatus.ARCHIVED]))

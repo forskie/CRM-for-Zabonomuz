@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.accounts.models import UserRole
-from apps.education.models import Attendance, AttendanceStatus, Course, Enrollment, EnrollmentStatus, Group, Lesson, Payment, PaymentStatus, RecordStatus, Student
+from apps.education.models import Attendance, AttendanceStatus, AuditLog, AuditAction, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, Payment, PaymentStatus, RecordStatus, Student
 
 
 User = get_user_model()
@@ -166,3 +166,227 @@ class DashboardTestCase(TestCase):
         response = self._get(self.owner)
         group_names = [g.name for g in response.context["active_groups"]]
         self.assertNotIn("Archived A1", group_names)
+
+
+class DashboardTodayLessonsTests(TestCase):
+    """Test the new TODAY section of the dashboard."""
+
+    password = "Secure-test-password-2026"
+
+    def setUp(self):
+        self.owner = User.objects.create_user("owner", password=self.password, role=UserRole.OWNER)
+        self.teacher_user = User.objects.create_user("teacher", password=self.password, role=UserRole.TEACHER)
+        course = Course.objects.create(name="Math", default_monthly_fee=Decimal("300.00"))
+        self.group = Group.objects.create(name="Math A1", course=course, teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("300.00"))
+        self.student = Student.objects.create(full_name="Тест Ученик", phone="900100001")
+        Enrollment.objects.create(student=self.student, group=self.group, started_at=date(2026, 8, 1))
+        self.today = date.today()
+        self.lesson = Lesson.objects.create(group=self.group, date=self.today, start_time=time(9, 0), end_time=time(10, 0))
+        self.tomorrow_lesson = Lesson.objects.create(
+            group=self.group,
+            date=self.today + timedelta(days=1),
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+        )
+
+    def _get(self, user):
+        self.client.force_login(user)
+        return self.client.get(reverse("dashboard"))
+
+    def test_today_display_contains_weekday(self):
+        response = self._get(self.owner)
+        self.assertIn("today_display", response.context)
+        display = response.context["today_display"]
+        self.assertTrue(len(display) > 5)
+
+    def test_today_lessons_total_count(self):
+        response = self._get(self.owner)
+        self.assertEqual(response.context["today_lessons_total"], 1)
+
+    def test_today_lessons_completed_count(self):
+        self.lesson.status = LessonStatus.COMPLETED
+        self.lesson.save(update_fields=("status",))
+        response = self._get(self.owner)
+        self.assertEqual(response.context["today_lessons_completed"], 1)
+
+    def test_today_lessons_pending_has_unmarked(self):
+        response = self._get(self.owner)
+        self.assertEqual(len(response.context["today_lessons_pending"]), 1)
+
+    def test_today_lessons_empty_when_no_lessons(self):
+        self.lesson.delete()
+        response = self._get(self.owner)
+        self.assertEqual(response.context["today_lessons_total"], 0)
+        self.assertEqual(len(response.context["today_lessons_pending"]), 0)
+
+    def test_teacher_today_scoped(self):
+        other = User.objects.create_user("othert", password=self.password, role=UserRole.TEACHER)
+        other_group = Group.objects.create(name="Other G", course=Course.objects.get(name="Math"), teacher=other.teacher_profile, monthly_fee=Decimal("200.00"))
+        Lesson.objects.create(group=other_group, date=self.today, start_time=time(11, 0), end_time=time(12, 0))
+        response = self._get(self.teacher_user)
+        self.assertEqual(response.context["today_lessons_total"], 1)
+
+    def test_upcoming_grouped_skips_today(self):
+        response = self._get(self.owner)
+        grouped = response.context["upcoming_grouped"]
+        for day_lessons in grouped.values():
+            for lesson in day_lessons:
+                self.assertNotEqual(lesson.date, self.today)
+
+    def test_upcoming_grouped_has_tomorrow(self):
+        response = self._get(self.owner)
+        grouped = response.context["upcoming_grouped"]
+        self.assertIn(self.today + timedelta(days=1), grouped)
+
+
+class DashboardActionRequiredTests(TestCase):
+    """Test the ACTION REQUIRED section."""
+
+    password = "Secure-test-password-2026"
+
+    def setUp(self):
+        self.owner = User.objects.create_user("owner", password=self.password, role=UserRole.OWNER)
+        self.teacher_user = User.objects.create_user("teacher", password=self.password, role=UserRole.TEACHER)
+        course = Course.objects.create(name="English", default_monthly_fee=Decimal("300.00"))
+        self.group = Group.objects.create(name="English A1", course=course, teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("350.00"))
+        self.student = Student.objects.create(full_name="Ученик Тест", phone="900200001")
+        Enrollment.objects.create(student=self.student, group=self.group, started_at=date(2026, 8, 1))
+        self.today = date.today()
+        self.lesson = Lesson.objects.create(group=self.group, date=self.today, start_time=time(18, 0), end_time=time(19, 0))
+
+    def _get(self, user):
+        self.client.force_login(user)
+        return self.client.get(reverse("dashboard"))
+
+    def test_pending_attendance_count_for_owner(self):
+        response = self._get(self.owner)
+        self.assertEqual(response.context["pending_attendance_count"], 1)
+
+    def test_pending_attendance_count_for_teacher(self):
+        response = self._get(self.teacher_user)
+        self.assertEqual(response.context["pending_attendance_count"], 1)
+
+    def test_no_pending_when_attendance_marked(self):
+        Attendance.objects.create(lesson=self.lesson, student=self.student, status=AttendanceStatus.PRESENT)
+        response = self._get(self.owner)
+        self.assertEqual(response.context["pending_attendance_count"], 0)
+
+    def test_action_required_section_rendered(self):
+        response = self._get(self.owner)
+        self.assertContains(response, "Требует внимания")
+
+
+class DashboardKPITests(TestCase):
+    """Test the compact KPI row."""
+
+    password = "Secure-test-password-2026"
+
+    def setUp(self):
+        self.owner = User.objects.create_user("owner", password=self.password, role=UserRole.OWNER)
+        self.teacher_user = User.objects.create_user("teacher", password=self.password, role=UserRole.TEACHER)
+        course = Course.objects.create(name="English", default_monthly_fee=Decimal("300.00"))
+        self.group = Group.objects.create(name="English A1", course=course, teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("350.00"))
+        self.student = Student.objects.create(full_name="Тест К", phone="900300001")
+        Enrollment.objects.create(student=self.student, group=self.group, started_at=date(2026, 8, 1))
+        today = date.today()
+        self.lesson = Lesson.objects.create(group=self.group, date=today, start_time=time(18, 0), end_time=time(19, 0))
+        Attendance.objects.create(lesson=self.lesson, student=self.student, status=AttendanceStatus.PRESENT)
+
+    def _get(self, user):
+        self.client.force_login(user)
+        return self.client.get(reverse("dashboard"))
+
+    def test_attendance_rate_for_owner(self):
+        response = self._get(self.owner)
+        self.assertIsNotNone(response.context["attendance_rate"])
+        self.assertEqual(response.context["attendance_rate"], 100)
+
+    def test_attendance_rate_none_when_no_data(self):
+        Attendance.objects.all().delete()
+        response = self._get(self.owner)
+        self.assertIsNone(response.context["attendance_rate"])
+
+    def test_attendance_total_for_owner(self):
+        response = self._get(self.owner)
+        self.assertEqual(response.context["attendance_total"], 1)
+
+    def test_kpi_rendered_in_html(self):
+        response = self._get(self.owner)
+        self.assertContains(response, "dash-kpi")
+
+    def test_teacher_no_money_in_kpi(self):
+        response = self._get(self.teacher_user)
+        self.assertNotContains(response, "Оплачено")
+
+
+class DashboardRecentActivityTests(TestCase):
+    """Test the RECENT ACTIVITY feed (admin/owner only)."""
+
+    password = "Secure-test-password-2026"
+
+    def setUp(self):
+        self.owner = User.objects.create_user("owner", password=self.password, role=UserRole.OWNER)
+        self.teacher_user = User.objects.create_user("teacher", password=self.password, role=UserRole.TEACHER)
+        course = Course.objects.create(name="English", default_monthly_fee=Decimal("300.00"))
+        self.group = Group.objects.create(name="English A1", course=course, teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("350.00"))
+        self.student = Student.objects.create(full_name="Активный Студент", phone="900400001")
+        Enrollment.objects.create(student=self.student, group=self.group, started_at=date(2026, 8, 1))
+        AuditLog.objects.create(
+            actor=self.owner,
+            action=AuditAction.STUDENT_CREATE,
+            target_type="Student",
+            target_id=self.student.pk,
+            description="Создание ученика",
+        )
+
+    def _get(self, user):
+        self.client.force_login(user)
+        return self.client.get(reverse("dashboard"))
+
+    def test_owner_sees_recent_activity(self):
+        response = self._get(self.owner)
+        self.assertEqual(len(response.context["recent_activity"]), 1)
+        self.assertContains(response, "Последняя активность")
+        self.assertContains(response, "Новый ученик")
+
+    def test_teacher_no_recent_activity(self):
+        response = self._get(self.teacher_user)
+        self.assertEqual(response.context["recent_activity"], [])
+        self.assertNotContains(response, "Последняя активность")
+
+
+class DashboardEmptyStatesTests(TestCase):
+    """Test empty state handling across all new dashboard sections."""
+
+    password = "Secure-test-password-2026"
+
+    def setUp(self):
+        self.owner = User.objects.create_user("owner", password=self.password, role=UserRole.OWNER)
+
+    def _get(self):
+        self.client.force_login(self.owner)
+        return self.client.get(reverse("dashboard"))
+
+    def test_empty_today_lessons(self):
+        response = self._get()
+        self.assertContains(response, "Занятий на сегодня нет.")
+
+    def test_empty_upcoming_lessons(self):
+        response = self._get()
+        self.assertContains(response, "Ближайших занятий нет.")
+
+    def test_empty_attendance(self):
+        response = self._get()
+        self.assertContains(response, "Нет данных о посещаемости.")
+
+    def test_empty_groups(self):
+        response = self._get()
+        self.assertContains(response, "Нет активных групп.")
+
+    def test_empty_recent_activity(self):
+        response = self._get()
+        self.assertContains(response, "Нет последней активности.")
+
+    def test_empty_action_required_ok(self):
+        response = self._get()
+        self.assertContains(response, "Всё в порядке")

@@ -35,4 +35,89 @@
     </dl>
   </div>
 </div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Группы ({{ active_groups|length }})</h2>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Группа</th>
+            <th>Курс</th>
+            <th>Учеников</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in active_groups %}
+            <tr>
+              <td><a href="{% url 'education:group-detail' group.pk %}"><strong>{{ group.name }}</strong></a></td>
+              <td>{{ group.course }}</td>
+              <td class="mono">{{ group.active_students_count }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3" class="table-empty">Нет активных групп.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{% if user.role != 'TEACHER' %}
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Расписание</h2>
+  </div>
+  <div class="panel__body">
+    <ul class="list">
+      {% for schedule in schedules %}
+        <li class="list__item">
+          <span class="list__main">
+            <a href="{% url 'education:group-detail' schedule.group.pk %}">{{ schedule.group }}</a>
+            <strong>{{ schedule.get_weekday_display }}</strong>
+            <span class="mono text-muted">{{ schedule.start_time }}–{{ schedule.end_time }}</span>
+          </span>
+        </li>
+      {% empty %}
+        <li class="list__item list__empty">Нет активных расписаний.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Ближайшие занятия</h2>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Время</th>
+            <th>Группа</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lesson in upcoming_lessons %}
+            <tr>
+              <td class="mono"><a href="{% url 'education:lesson-detail' lesson.pk %}"><strong>{{ lesson.date }}</strong></a></td>
+              <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
+              <td>{{ lesson.group }}</td>
+              <td><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="table-empty">Нет ближайших занятий.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
 {% endblock %}

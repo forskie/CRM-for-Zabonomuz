@@ -131,7 +131,18 @@ def teacher_detail(request: HttpRequest, pk: int) -> HttpResponse:
     teacher = get_object_or_404(Teacher, pk=pk)
     if _is_teacher(request) and teacher.user_id != request.user.id:
         raise PermissionDenied
-    return render(request, "education/teacher_detail.html", {"teacher": teacher})
+    today = timezone.localdate()
+    active_groups = Group.objects.filter(teacher=teacher, status=RecordStatus.ACTIVE).select_related("course").annotate(
+        active_students_count=Count("enrollments", filter=Q(enrollments__status=EnrollmentStatus.ACTIVE)),
+    )
+    schedules = Schedule.objects.filter(group__teacher=teacher, is_active=True).select_related("group").order_by("weekday", "start_time")
+    upcoming_lessons = Lesson.objects.filter(group__teacher=teacher, date__gte=today).exclude(status=LessonStatus.CANCELLED).select_related("group").order_by("date", "start_time")[:10]
+    return render(request, "education/teacher_detail.html", {
+        "teacher": teacher,
+        "active_groups": active_groups,
+        "schedules": schedules,
+        "upcoming_lessons": upcoming_lessons,
+    })
 
 
 @operational_required
@@ -149,6 +160,7 @@ def teacher_edit(request: HttpRequest, pk: int) -> HttpResponse:
     form = TeacherForm(request.POST or None, instance=teacher)
     if request.method == "POST" and form.is_valid():
         form.save()
+        record_audit(request.user, AuditAction.TEACHER_EDIT, "Teacher", teacher.pk, str(teacher))
         return redirect("education:teacher-detail", pk=teacher.pk)
     return render(request, "education/form.html", {"form": form, "title": "Изменить преподавателя"})
 
@@ -158,8 +170,11 @@ def teacher_set_status(request: HttpRequest, pk: int, status: str) -> HttpRespon
     if request.method != "POST" or status not in RecordStatus.values:
         raise PermissionDenied
     teacher = get_object_or_404(Teacher, pk=pk)
+    previous = teacher.status
     teacher.status = status
     teacher.save(update_fields=("status", "updated_at"))
+    if previous != status:
+        record_audit(request.user, AuditAction.TEACHER_STATUS, "Teacher", teacher.pk, f"{teacher} → {teacher.get_status_display()}")
     return redirect("education:teacher-detail", pk=pk)
 
 
@@ -183,8 +198,18 @@ def course_create(request: HttpRequest) -> HttpResponse:
     form = CourseForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         course = form.save()
-        return redirect("education:course-list")
+        record_audit(request.user, AuditAction.COURSE_CREATE, "Course", course.pk, course.name)
+        return redirect("education:course-detail", pk=course.pk)
     return render(request, "education/form.html", {"form": form, "title": "Новый курс"})
+
+
+@login_required
+def course_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    course = get_object_or_404(Course, pk=pk)
+    groups = Group.objects.filter(course=course, status=RecordStatus.ACTIVE).select_related("teacher__user").annotate(
+        active_students_count=Count("enrollments", filter=Q(enrollments__status=EnrollmentStatus.ACTIVE)),
+    )
+    return render(request, "education/course_detail.html", {"course": course, "groups": groups})
 
 
 @operational_required
@@ -193,6 +218,7 @@ def course_edit(request: HttpRequest, pk: int) -> HttpResponse:
     form = CourseForm(request.POST or None, instance=course)
     if request.method == "POST" and form.is_valid():
         form.save()
+        record_audit(request.user, AuditAction.COURSE_EDIT, "Course", course.pk, course.name)
         return redirect("education:course-list")
     return render(request, "education/form.html", {"form": form, "title": "Изменить курс"})
 
@@ -204,6 +230,7 @@ def course_set_status(request: HttpRequest, pk: int, status: str) -> HttpRespons
     course = get_object_or_404(Course, pk=pk)
     course.status = status
     course.save(update_fields=("status", "updated_at"))
+    record_audit(request.user, AuditAction.COURSE_STATUS, "Course", course.pk, f"{course.name} → {course.get_status_display()}")
     return redirect("education:course-list")
 
 
@@ -257,6 +284,7 @@ def group_create(request: HttpRequest) -> HttpResponse:
     form = GroupForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         group = form.save()
+        record_audit(request.user, AuditAction.GROUP_CREATE, "Group", group.pk, f"{group.name}: {group.course} / {group.teacher}")
         return redirect("education:group-detail", pk=group.pk)
     return render(request, "education/form.html", {"form": form, "title": "Новая группа"})
 
@@ -267,6 +295,7 @@ def group_edit(request: HttpRequest, pk: int) -> HttpResponse:
     form = GroupForm(request.POST or None, instance=group)
     if request.method == "POST" and form.is_valid():
         form.save()
+        record_audit(request.user, AuditAction.GROUP_EDIT, "Group", group.pk, f"{group.name}: {group.course} / {group.teacher}")
         return redirect("education:group-detail", pk=group.pk)
     return render(request, "education/form.html", {"form": form, "title": "Изменить группу"})
 
@@ -278,6 +307,7 @@ def group_set_status(request: HttpRequest, pk: int, status: str) -> HttpResponse
     group = get_object_or_404(Group, pk=pk)
     group.status = status
     group.save(update_fields=("status", "updated_at"))
+    record_audit(request.user, AuditAction.GROUP_STATUS, "Group", group.pk, f"{group.name} → {group.get_status_display()}")
     return redirect("education:group-detail", pk=pk)
 
 
@@ -395,7 +425,7 @@ def lesson_list(request: HttpRequest) -> HttpResponse:
 @login_required
 def lesson_detail(request: HttpRequest, pk: int) -> HttpResponse:
     lesson = get_object_or_404(_lessons_for_request(request), pk=pk)
-    can_edit = not _is_teacher(request)
+    can_edit = not _is_teacher(request) or lesson.group.teacher.user == request.user
     form = AttendanceBulkForm(request.POST or None, lesson=lesson)
     if request.method == "POST":
         if not can_edit:
@@ -513,6 +543,9 @@ def lesson_complete(request: HttpRequest, pk: int) -> HttpResponse:
     lesson = get_object_or_404(_lessons_for_request(request), pk=pk)
     if lesson.status != LessonStatus.SCHEDULED:
         raise PermissionDenied
+    if not lesson.attendance_records.exists():
+        messages.error(request, "Невозможно завершить занятие: посещаемость не отмечена.")
+        return redirect("education:lesson-detail", pk=lesson.pk)
     lesson.status = LessonStatus.COMPLETED
     lesson.full_clean()
     lesson.save(update_fields=("status", "updated_at"))

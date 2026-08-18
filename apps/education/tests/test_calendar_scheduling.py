@@ -9,6 +9,8 @@ from django.urls import reverse
 
 from apps.accounts.models import UserRole
 from apps.education.models import (
+    Attendance,
+    AttendanceStatus,
     AuditAction,
     AuditLog,
     Course,
@@ -325,6 +327,10 @@ class LessonCompleteTests(CalendarSchedulingBase):
         super().setUp()
         self.lesson = Lesson.objects.create(group=self.group_a, date=date(2026, 8, 17), start_time=time(18), end_time=time(19))
         self.foreign_lesson = Lesson.objects.create(group=self.group_b, date=date(2026, 8, 18), start_time=time(18), end_time=time(19))
+        Attendance.objects.create(lesson=self.lesson, student=self.student, status=AttendanceStatus.PRESENT)
+        foreign_student = Student.objects.create(full_name="Чужой ученик", phone="900999999")
+        Enrollment.objects.create(student=foreign_student, group=self.group_b, started_at=date(2026, 8, 1))
+        Attendance.objects.create(lesson=self.foreign_lesson, student=foreign_student, status=AttendanceStatus.PRESENT)
 
     def _post(self, user, lesson):
         self.client.force_login(user)

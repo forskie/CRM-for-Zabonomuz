@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ course.name }} — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head__main">
+    <h1 class="page-title">{{ course.name }}</h1>
+    <p class="page-sub">
+      <span class="badge badge--{{ course.status|lower }}">{{ course.get_status_display }}</span>
+    </p>
+  </div>
+  {% if user.role != "TEACHER" %}
+    <div class="page-actions">
+      <a href="{% url 'education:course-edit' course.pk %}" class="btn">Редактировать</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel__body">
+    <dl class="dl">
+      <dt>Описание</dt><dd>{{ course.description|default:"—" }}</dd>
+      <dt>Стоимость</dt><dd class="mono">{{ course.default_monthly_fee }} TJS / мес.</dd>
+      <dt>Статус</dt><dd><span class="badge badge--{{ course.status|lower }}">{{ course.get_status_display }}</span></dd>
+    </dl>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Группы ({{ groups|length }})</h2>
+  </div>
+  <div class="panel__body panel__body--tight">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Группа</th>
+            <th>Преподаватель</th>
+            <th>Стоимость</th>
+            <th>Учеников</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in groups %}
+            <tr>
+              <td><a href="{% url 'education:group-detail' group.pk %}"><strong>{{ group.name }}</strong></a></td>
+              <td>{{ group.teacher }}</td>
+              <td class="mono">{{ group.monthly_fee }} TJS</td>
+              <td class="mono">{{ group.active_students_count }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="table-empty">Нет активных групп.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

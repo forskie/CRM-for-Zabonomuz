@@ -18,6 +18,7 @@ urlpatterns = [
     path("teachers/<int:pk>/<str:status>/", views.teacher_set_status, name="teacher-status"),
     path("courses/", views.course_list, name="course-list"),
     path("courses/create/", views.course_create, name="course-create"),
+    path("courses/<int:pk>/", views.course_detail, name="course-detail"),
     path("courses/<int:pk>/edit/", views.course_edit, name="course-edit"),
     path("courses/<int:pk>/<str:status>/", views.course_set_status, name="course-status"),
     path("groups/", views.group_list, name="group-list"),

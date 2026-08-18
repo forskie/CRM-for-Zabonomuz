@@ -55,7 +55,7 @@ class FullBusinessCycleTests(BusinessWorkflowBase):
         # 1. Course
         response = self.client.post(reverse("education:course-create"), {"name": "Математика", "description": "", "default_monthly_fee": "250.00"})
         course = Course.objects.get(name="Математика")
-        self.assertRedirects(response, reverse("education:course-list"))
+        self.assertRedirects(response, reverse("education:course-detail", args=[course.pk]))
         self.assertEqual(course.default_monthly_fee, Decimal("250.00"))
 
         # 2. Group with its own fee independent of the course

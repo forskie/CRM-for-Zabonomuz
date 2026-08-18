@@ -107,13 +107,12 @@ class AttendanceTestCase(TestCase):
         self.assertEqual(record.note, "Болел")
         self.assertEqual(Attendance.objects.filter(lesson=self.lesson).count(), 1)
 
-    def test_teacher_cannot_modify_attendance(self):
+    def test_teacher_can_mark_attendance_on_own_lesson(self):
         self.client.force_login(self.teacher_user)
-        response = self.client.post(reverse("education:lesson-detail", args=[self.lesson.pk]), {
-            f"status_{self.student.pk}": AttendanceStatus.PRESENT,
-        })
-        self.assertEqual(response.status_code, 403)
-        self.assertFalse(Attendance.objects.filter(lesson=self.lesson).exists())
+        response = self.client.post(reverse("education:lesson-detail", args=[self.lesson.pk]), self._mark_fields(self.lesson))
+        self.assertRedirects(response, reverse("education:lesson-detail", args=[self.lesson.pk]))
+        self.assertEqual(Attendance.objects.filter(lesson=self.lesson).count(), 2)
+        self.assertEqual(Attendance.objects.get(lesson=self.lesson, student=self.student).status, AttendanceStatus.PRESENT)
 
     def test_teacher_cannot_modify_foreign_lesson(self):
         self.client.force_login(self.teacher_user)

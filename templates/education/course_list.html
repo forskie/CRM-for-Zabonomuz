@@ -46,7 +46,7 @@
         <tbody>
           {% for course in page_obj %}
             <tr>
-              <td><strong>{{ course.name }}</strong></td>
+              <td><a href="{% url 'education:course-detail' course.pk %}"><strong>{{ course.name }}</strong></a></td>
               {% if user.role != "TEACHER" %}<td class="mono">{{ course.default_monthly_fee }} TJS</td>{% endif %}
               <td>
                 <span class="badge badge--{{ course.status|lower }}">{{ course.get_status_display }}</span>

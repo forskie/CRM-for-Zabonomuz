@@ -302,6 +302,14 @@ class AuditAction(models.TextChoices):
     SCHEDULE_EDIT = "SCHEDULE_EDIT", _("Изменение расписания")
     SCHEDULE_DEACTIVATE = "SCHEDULE_DEACTIVATE", _("Деактивация расписания")
     SCHEDULE_GENERATE = "SCHEDULE_GENERATE", _("Генерация занятий")
+    COURSE_CREATE = "COURSE_CREATE", _("Создание курса")
+    COURSE_EDIT = "COURSE_EDIT", _("Изменение курса")
+    COURSE_STATUS = "COURSE_STATUS", _("Изменение статуса курса")
+    GROUP_CREATE = "GROUP_CREATE", _("Создание группы")
+    GROUP_EDIT = "GROUP_EDIT", _("Изменение группы")
+    GROUP_STATUS = "GROUP_STATUS", _("Изменение статуса группы")
+    TEACHER_EDIT = "TEACHER_EDIT", _("Изменение преподавателя")
+    TEACHER_STATUS = "TEACHER_STATUS", _("Изменение статуса преподавателя")
 
 
 class AuditLog(models.Model):
