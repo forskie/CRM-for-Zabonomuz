@@ -167,6 +167,65 @@ class Schedule(models.Model):
         return f"{self.group}: {self.get_weekday_display()} {self.start_time}–{self.end_time}"
 
 
+class OverrideType(models.TextChoices):
+    CANCELLED = "CANCELLED", _("Отменено")
+    RESCHEDULED = "RESCHEDULED", _("Перенесено")
+    SUBSTITUTE = "SUBSTITUTE", _("Замена преподавателя")
+
+
+class ScheduleOverride(models.Model):
+    """Specific date exception for a Schedule rule.
+
+    One Schedule can have multiple overrides, but only one per date.
+    When an override exists for a date, it replaces the normal schedule
+    behavior for that single occurrence.
+    """
+
+    schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE, related_name="overrides", db_index=True)
+    date = models.DateField(db_index=True)
+    override_type = models.CharField(max_length=16, choices=OverrideType.choices, db_index=True)
+
+    # For RESCHEDULED: new date/time
+    new_date = models.DateField(null=True, blank=True)
+    new_start_time = models.TimeField(null=True, blank=True)
+    new_end_time = models.TimeField(null=True, blank=True)
+
+    # For SUBSTITUTE: temporary teacher replacement
+    substitute_teacher = models.ForeignKey(Teacher, on_delete=models.PROTECT, null=True, blank=True, related_name="substitute_overrides")
+
+    reason = models.CharField(max_length=255, blank=True)
+    note = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("date",)
+        constraints = [
+            models.UniqueConstraint(fields=("schedule", "date"), name="unique_override_per_schedule_date"),
+        ]
+
+    def clean(self) -> None:
+        errors = {}
+        if self.override_type == OverrideType.RESCHEDULED:
+            if not self.new_date:
+                errors["new_date"] = "Укажите новую дату для переноса."
+            if not self.new_start_time or not self.new_end_time:
+                errors["new_start_time"] = "Укажите новое время."
+            if self.new_start_time and self.new_end_time and self.new_start_time >= self.new_end_time:
+                errors["new_end_time"] = "Время окончания должно быть позже времени начала."
+        if self.override_type == OverrideType.SUBSTITUTE:
+            if not self.substitute_teacher_id:
+                errors["substitute_teacher"] = "Укажите заменяющего преподавателя."
+            elif self.schedule_id and self.substitute_teacher_id == self.schedule.group.teacher_id:
+                errors["substitute_teacher"] = "Замена должна быть другим преподавателем."
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self) -> str:
+        return f"{self.schedule.group}: {self.date} — {self.get_override_type_display()}"
+
+
 class LessonStatus(models.TextChoices):
     SCHEDULED = "SCHEDULED", _("Запланировано")
     COMPLETED = "COMPLETED", _("Завершено")
@@ -180,6 +239,7 @@ class Lesson(models.Model):
     end_time = models.TimeField()
     status = models.CharField(max_length=16, choices=LessonStatus.choices, default=LessonStatus.SCHEDULED, db_index=True)
     schedule = models.ForeignKey(Schedule, on_delete=models.SET_NULL, null=True, blank=True, related_name="lessons")
+    source = models.CharField(max_length=16, choices=[("NORMAL", "Расписание"), ("OVERRIDE", "Исключение")], default="NORMAL", db_index=True)
     topic = models.CharField(max_length=255, blank=True)
     teacher_note = models.TextField(blank=True)
     homework = models.TextField(blank=True)
@@ -302,6 +362,9 @@ class AuditAction(models.TextChoices):
     SCHEDULE_EDIT = "SCHEDULE_EDIT", _("Изменение расписания")
     SCHEDULE_DEACTIVATE = "SCHEDULE_DEACTIVATE", _("Деактивация расписания")
     SCHEDULE_GENERATE = "SCHEDULE_GENERATE", _("Генерация занятий")
+    OVERRIDE_CREATE = "OVERRIDE_CREATE", _("Создание исключения расписания")
+    OVERRIDE_EDIT = "OVERRIDE_EDIT", _("Изменение исключения расписания")
+    OVERRIDE_DELETE = "OVERRIDE_DELETE", _("Удаление исключения расписания")
     COURSE_CREATE = "COURSE_CREATE", _("Создание курса")
     COURSE_EDIT = "COURSE_EDIT", _("Изменение курса")
     COURSE_STATUS = "COURSE_STATUS", _("Изменение статуса курса")

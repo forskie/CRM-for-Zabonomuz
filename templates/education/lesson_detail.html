@@ -74,6 +74,7 @@
       <dt>Дата</dt><dd class="mono">{{ lesson.date }}</dd>
       <dt>Время</dt><dd class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</dd>
       <dt>Статус</dt><dd><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></dd>
+      {% if lesson.source == 'OVERRIDE' %}<dt>Источник</dt><dd><span class="badge badge--substitute">Исключение расписания</span></dd>{% endif %}
     </dl>
   </div>
 </div>

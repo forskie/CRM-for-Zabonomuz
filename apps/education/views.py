@@ -15,9 +15,10 @@ from apps.accounts.models import UserRole
 from apps.accounts.permissions import operational_required
 
 from .audit import record_audit
-from .forms import AttendanceBulkForm, CourseForm, EnrollmentCreateForm, EnrollmentEndForm, GroupForm, LessonForm, LessonFromScheduleForm, LessonReportForm, LessonRescheduleForm, PaymentEditForm, PaymentForm, ScheduleForm, ScheduleGenerateForm, StudentForm, TeacherCreateForm, TeacherForm
-from .models import Attendance, AttendanceStatus, AuditAction, AuditLog, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, Payment, PaymentStatus, RecordStatus, Schedule, Student, Teacher
+from .forms import AttendanceBulkForm, CourseForm, EnrollmentCreateForm, EnrollmentEndForm, GroupForm, LessonForm, LessonFromScheduleForm, LessonReportForm, LessonRescheduleForm, PaymentEditForm, PaymentForm, ScheduleForm, ScheduleGenerateForm, ScheduleOverrideForm, StudentForm, TeacherCreateForm, TeacherForm
+from .models import Attendance, AttendanceStatus, AuditAction, AuditLog, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, Payment, PaymentStatus, RecordStatus, Schedule, ScheduleOverride, Student, Teacher
 from .services import generate_lessons, preview_lessons
+from .materialize import materialize_range
 
 
 def _page(request: HttpRequest, queryset):
@@ -136,6 +137,8 @@ def teacher_detail(request: HttpRequest, pk: int) -> HttpResponse:
         active_students_count=Count("enrollments", filter=Q(enrollments__status=EnrollmentStatus.ACTIVE)),
     )
     schedules = Schedule.objects.filter(group__teacher=teacher, is_active=True).select_related("group").order_by("weekday", "start_time")
+    for g in active_groups:
+        materialize_range(g, today, today + timedelta(days=60))
     upcoming_lessons = Lesson.objects.filter(group__teacher=teacher, date__gte=today).exclude(status=LessonStatus.CANCELLED).select_related("group").order_by("date", "start_time")[:10]
     return render(request, "education/teacher_detail.html", {
         "teacher": teacher,
@@ -268,6 +271,7 @@ def group_detail(request: HttpRequest, pk: int) -> HttpResponse:
     group = _group_for_request(request, pk)
     active_enrollments = group.enrollments.filter(status=EnrollmentStatus.ACTIVE).select_related("student")
     today = timezone.localdate()
+    materialize_range(group, today - timedelta(days=7), today + timedelta(days=60))
     attendance = Attendance.objects.filter(lesson__group=group)
     if _is_teacher(request):
         payments = Payment.objects.none()
@@ -276,7 +280,7 @@ def group_detail(request: HttpRequest, pk: int) -> HttpResponse:
         payments = group.payments.select_related("student").order_by("-paid_at", "-pk")
         payments_total = payments.filter(status=PaymentStatus.PAID).aggregate(total=Sum("amount"))["total"] or Decimal("0")
         payments_total = payments_total.quantize(Decimal("0.01"))
-    return render(request, "education/group_detail.html", {"group": group, "active_enrollments": active_enrollments, "history_enrollments": group.enrollments.filter(status=EnrollmentStatus.ENDED).select_related("student"), "schedules": group.schedules.all(), "upcoming_lessons": group.lessons.filter(date__gte=today).exclude(status=LessonStatus.CANCELLED)[:10], "past_lessons": group.lessons.filter(date__lt=today)[:10], "attendance_stats": {"lessons": group.lessons.count(), "present": attendance.filter(status=AttendanceStatus.PRESENT).count(), "absent": attendance.filter(status=AttendanceStatus.ABSENT).count(), "late": attendance.filter(status=AttendanceStatus.LATE).count()}, "payments": payments, "payments_total": payments_total})
+    return render(request, "education/group_detail.html", {"group": group, "active_enrollments": active_enrollments, "history_enrollments": group.enrollments.filter(status=EnrollmentStatus.ENDED).select_related("student"), "schedules": group.schedules.prefetch_related("overrides").all(), "upcoming_lessons": group.lessons.filter(date__gte=today).exclude(status=LessonStatus.CANCELLED)[:10], "past_lessons": group.lessons.filter(date__lt=today)[:10], "attendance_stats": {"lessons": group.lessons.count(), "present": attendance.filter(status=AttendanceStatus.PRESENT).count(), "absent": attendance.filter(status=AttendanceStatus.ABSENT).count(), "late": attendance.filter(status=AttendanceStatus.LATE).count()}, "payments": payments, "payments_total": payments_total})
 
 
 @operational_required
@@ -390,6 +394,46 @@ def schedule_generate(request: HttpRequest, schedule_pk: int) -> HttpResponse:
             messages.success(request, f"Создано занятий: {result.created}. Пропущено дубликатов: {result.skipped}. Конфликтов: {result.conflicts}.")
             return redirect("education:group-detail", pk=schedule.group_id)
     return render(request, "education/schedule_generate.html", {"form": form, "schedule": schedule, "preview": preview})
+
+
+@operational_required
+def override_create(request: HttpRequest, schedule_pk: int) -> HttpResponse:
+    schedule = get_object_or_404(Schedule, pk=schedule_pk)
+    form = ScheduleOverrideForm(request.POST or None, schedule=schedule)
+    if request.method == "POST" and form.is_valid():
+        override = form.save()
+        override.full_clean()
+        override.save()
+        record_audit(request.user, AuditAction.OVERRIDE_CREATE, "ScheduleOverride", override.pk, f"{schedule.group}: {override.date} — {override.get_override_type_display()}")
+        messages.success(request, "Исключение расписания создано.")
+        return redirect("education:group-detail", pk=schedule.group_id)
+    return render(request, "education/form.html", {"form": form, "title": f"Исключение для {schedule}"})
+
+
+@operational_required
+def override_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    override = get_object_or_404(ScheduleOverride, pk=pk)
+    form = ScheduleOverrideForm(request.POST or None, instance=override, schedule=override.schedule)
+    if request.method == "POST" and form.is_valid():
+        override = form.save()
+        override.full_clean()
+        override.save()
+        record_audit(request.user, AuditAction.OVERRIDE_EDIT, "ScheduleOverride", override.pk, f"{override.schedule.group}: {override.date} — {override.get_override_type_display()}")
+        messages.success(request, "Исключение расписания изменено.")
+        return redirect("education:group-detail", pk=override.schedule.group_id)
+    return render(request, "education/form.html", {"form": form, "title": "Изменить исключение"})
+
+
+@operational_required
+def override_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    if request.method != "POST":
+        raise PermissionDenied
+    override = get_object_or_404(ScheduleOverride, pk=pk)
+    group_id = override.schedule.group_id
+    record_audit(request.user, AuditAction.OVERRIDE_DELETE, "ScheduleOverride", override.pk, f"{override.schedule.group}: {override.date} — {override.get_override_type_display()}")
+    override.delete()
+    messages.success(request, "Исключение расписания удалено.")
+    return redirect("education:group-detail", pk=group_id)
 
 
 def _lessons_for_request(request: HttpRequest):
@@ -586,6 +630,12 @@ def calendar_view(request: HttpRequest) -> HttpResponse:
     else:
         start = anchor - timedelta(days=anchor.weekday())
         end = start + timedelta(days=6)
+
+    materialize_groups = Group.objects.filter(status=RecordStatus.ACTIVE, schedules__is_active=True).distinct()
+    if _is_teacher(request):
+        materialize_groups = materialize_groups.filter(teacher=request.user.teacher_profile)
+    for g in materialize_groups:
+        materialize_range(g, start, end)
 
     lessons = lessons.filter(date__gte=start, date__lte=end).order_by("date", "start_time")
     lessons_by_day = defaultdict(list)

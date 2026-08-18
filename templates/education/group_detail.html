@@ -43,27 +43,53 @@
     <div class="panel__body">
       <ul class="list">
         {% for schedule in schedules %}
-          <li class="list__item">
-            <span class="list__main">
-              <strong>{{ schedule.get_weekday_display }}</strong>
-              <span class="mono text-muted">{{ schedule.start_time }}–{{ schedule.end_time }}</span>
-              {% if schedule.start_date or schedule.end_date %}
-                <span class="mono text-muted">{% if schedule.start_date %}с {{ schedule.start_date }}{% endif %}{% if schedule.end_date %} по {{ schedule.end_date }}{% endif %}</span>
-              {% endif %}
-              {% if not schedule.is_active %}<span class="badge badge--archived">Неактивно</span>{% endif %}
-            </span>
-            {% if user.role != 'TEACHER' %}
-              <span class="list__actions">
-                <a href="{% url 'education:schedule-edit' schedule.pk %}" class="btn btn--sm">Изменить</a>
-                {% if schedule.is_active %}
-                  <a href="{% url 'education:schedule-generate' schedule.pk %}" class="btn btn--sm btn--primary">Генерация</a>
-                  <form class="inline-form" method="post" action="{% url 'education:schedule-deactivate' schedule.pk %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn--sm btn--ghost">Деактивировать</button>
-                  </form>
+          <li class="list__item" style="flex-direction:column;align-items:stretch;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="list__main">
+                <strong>{{ schedule.get_weekday_display }}</strong>
+                <span class="mono text-muted">{{ schedule.start_time }}–{{ schedule.end_time }}</span>
+                {% if schedule.start_date or schedule.end_date %}
+                  <span class="mono text-muted">{% if schedule.start_date %}с {{ schedule.start_date }}{% endif %}{% if schedule.end_date %} по {{ schedule.end_date }}{% endif %}</span>
                 {% endif %}
-                <a href="{% url 'education:lesson-from-schedule' schedule.pk %}" class="btn btn--sm">Создать занятие</a>
+                {% if not schedule.is_active %}<span class="badge badge--archived">Неактивно</span>{% endif %}
               </span>
+              {% if user.role != 'TEACHER' %}
+                <span class="list__actions">
+                  <a href="{% url 'education:schedule-edit' schedule.pk %}" class="btn btn--sm">Изменить</a>
+                  {% if schedule.is_active %}
+                    <a href="{% url 'education:schedule-generate' schedule.pk %}" class="btn btn--sm btn--primary">Генерация</a>
+                    <form class="inline-form" method="post" action="{% url 'education:schedule-deactivate' schedule.pk %}">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn--sm btn--ghost">Деактивировать</button>
+                    </form>
+                  {% endif %}
+                  <a href="{% url 'education:lesson-from-schedule' schedule.pk %}" class="btn btn--sm">Создать занятие</a>
+                </span>
+              {% endif %}
+            </div>
+            {% if schedule.overrides.all %}
+              <div style="margin-top:6px;padding-left:12px;border-left:2px solid var(--color-warning, #f59e0b);">
+                <span class="text-muted" style="font-size:0.85em;">Исключения:</span>
+                {% for ov in schedule.overrides.all %}
+                  <span class="badge badge--{{ ov.override_type|lower }}" style="font-size:0.8em;">
+                    {{ ov.date }}: {{ ov.get_override_type_display }}
+                    {% if ov.new_date %}→ {{ ov.new_date }}{% endif %}
+                    {% if ov.substitute_teacher %}({{ ov.substitute_teacher }}){% endif %}
+                  </span>
+                  {% if user.role != 'TEACHER' %}
+                    <a href="{% url 'education:override-edit' ov.pk %}" style="font-size:0.8em;">Изм.</a>
+                    <form class="inline-form" method="post" action="{% url 'education:override-delete' ov.pk %}" style="display:inline;">
+                      {% csrf_token %}
+                      <button type="submit" style="font-size:0.8em;color:var(--color-danger, #ef4444);background:none;border:none;cursor:pointer;">Удал.</button>
+                    </form>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if user.role != 'TEACHER' and schedule.is_active %}
+              <div style="margin-top:4px;padding-left:12px;">
+                <a href="{% url 'education:override-create' schedule.pk %}" class="btn btn--sm btn--ghost">+ Исключение</a>
+              </div>
             {% endif %}
           </li>
         {% empty %}

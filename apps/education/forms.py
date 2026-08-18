@@ -9,7 +9,7 @@ from django.db.models import Q
 
 from apps.accounts.models import UserRole
 
-from .models import Attendance, AttendanceStatus, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, Payment, PaymentStatus, Schedule, Student, Teacher
+from .models import Attendance, AttendanceStatus, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, OverrideType, Payment, PaymentStatus, Schedule, ScheduleOverride, Student, Teacher
 
 
 PHONE_PATTERN = re.compile(r"^[0-9+()\-\s]{5,32}$")
@@ -403,3 +403,40 @@ class PaymentEditForm(PaymentForm):
     class Meta(PaymentForm.Meta):
         fields = ("student", "group", "amount", "paid_at", "period", "status", "note")
         labels = {**PaymentForm.Meta.labels, "status": "Статус"}
+
+
+class ScheduleOverrideForm(forms.ModelForm):
+    class Meta:
+        model = ScheduleOverride
+        fields = ("date", "override_type", "new_date", "new_start_time", "new_end_time", "substitute_teacher", "reason", "note")
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date"}),
+            "new_date": forms.DateInput(attrs={"type": "date"}),
+            "new_start_time": forms.TimeInput(attrs={"type": "time"}),
+            "new_end_time": forms.TimeInput(attrs={"type": "time"}),
+            "reason": forms.TextInput(attrs={"placeholder": "Например: праздничный день"}),
+            "note": forms.Textarea(attrs={"rows": 2}),
+        }
+        labels = {
+            "date": "Дата",
+            "override_type": "Тип исключения",
+            "new_date": "Новая дата",
+            "new_start_time": "Новое время начала",
+            "new_end_time": "Новое время окончания",
+            "substitute_teacher": "Заменяющий преподаватель",
+            "reason": "Причина",
+            "note": "Примечание",
+        }
+
+    def __init__(self, *args, schedule: Schedule, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.schedule = schedule
+        teachers = Teacher.objects.filter(status="ACTIVE").exclude(pk=schedule.group.teacher_id)
+        self.fields["substitute_teacher"].queryset = teachers
+
+    def save(self, commit=True):
+        override = super().save(commit=False)
+        override.schedule = self.schedule
+        if commit:
+            override.save()
+        return override

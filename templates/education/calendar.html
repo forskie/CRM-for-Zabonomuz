@@ -68,7 +68,7 @@
           {% for lesson in lessons_by_day|get_item:anchor %}
             <tr>
               <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
-              <td><a href="{% url 'education:lesson-detail' lesson.pk %}" class="mono"><strong>{{ lesson.group }}</strong></a></td>
+              <td><a href="{% url 'education:lesson-detail' lesson.pk %}" class="mono"><strong>{{ lesson.group }}</strong>{% if lesson.source == 'OVERRIDE' %} <span class="badge badge--substitute" style="font-size:0.7em;">*</span>{% endif %}</a></td>
               <td>{{ lesson.group.teacher }}</td>
               <td><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></td>
               <td class="mono">{{ lesson.active_count }}</td>
@@ -100,7 +100,7 @@
           {% for lesson in lessons_by_day|get_item:day %}
             <a href="{% url 'education:lesson-detail' lesson.pk %}" class="cal-lesson cal-lesson--{{ lesson.status|lower }}">
               <span class="cal-lesson__time">{{ lesson.start_time|time:"H:i" }}</span>
-              <span class="cal-lesson__name">{{ lesson.group }}</span>
+              <span class="cal-lesson__name">{{ lesson.group }}{% if lesson.source == 'OVERRIDE' %} <span class="badge badge--substitute" style="font-size:0.7em;"> *</span>{% endif %}</span>
             </a>
           {% empty %}
             <span class="calendar-day__empty">Нет занятий</span>
