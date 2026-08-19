@@ -272,6 +272,29 @@ class LessonRescheduleTests(CalendarSchedulingBase):
         self.lesson.refresh_from_db()
         self.assertEqual(self.lesson.start_time, time(18))
 
+    def test_reschedule_keeps_occurrence_identity_and_prevents_duplicate(self):
+        """A moved occurrence remains linked and is not re-created at its original date."""
+        from apps.education.materialize import materialize_range
+        schedule = Schedule.objects.create(group=self.group_a, weekday=0, start_time=time(18), end_time=time(19))
+        schedule.start_date = date(2026, 8, 24)
+        schedule.end_date = date(2026, 9, 7)
+        schedule.save(update_fields=("start_date", "end_date"))
+        materialize_range(self.group_a, date(2026, 8, 24), date(2026, 9, 7))
+        target_date = date(2026, 8, 31)
+        lesson = Lesson.objects.get(schedule=schedule, date=target_date)
+        self.assertEqual(lesson.schedule_id, schedule.pk)
+        new_date = "2026-09-02"
+        self._post(self.admin, lesson=lesson, date=new_date, start_time="10:00", end_time="11:00")
+        lesson.refresh_from_db()
+        self.assertEqual(lesson.schedule_id, schedule.pk)
+        self.assertEqual(lesson.occurrence_date, target_date)
+        self.assertEqual(lesson.date, date(2026, 9, 2))
+        self.assertEqual(Lesson.objects.filter(schedule=schedule, date=target_date).count(), 0)
+        materialized = materialize_range(self.group_a, date(2026, 8, 24), date(2026, 9, 7))
+        aug_31_lessons = Lesson.objects.filter(group=self.group_a, date=target_date)
+        self.assertEqual(aug_31_lessons.count(), 0)
+        self.assertEqual(Lesson.objects.filter(schedule=schedule, occurrence_date=target_date).count(), 1)
+
 
 class LessonReportTests(CalendarSchedulingBase):
     def setUp(self):
@@ -440,12 +463,12 @@ class DashboardSchedulingTests(CalendarSchedulingBase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(future, response.context["upcoming_lessons"])
         self.assertEqual(len(response.context["today_lessons"]), 1)
-        self.assertContains(response, "Занятия сегодня")
+        self.assertContains(response, "Сегодня")
 
     def test_teacher_dashboard_attendance_pending_and_recent(self):
-        today_lesson = Lesson.objects.create(group=self.group_a, date=self.today, start_time=time(18), end_time=time(19))
+        today_lesson = Lesson.objects.create(group=self.group_a, date=self.today, start_time=time(0), end_time=time(0, 1))
         past_lesson = Lesson.objects.create(group=self.group_a, date=self.today - timedelta(days=3), start_time=time(18), end_time=time(19), status=LessonStatus.COMPLETED)
-        foreign_pending = Lesson.objects.create(group=self.group_b, date=self.today, start_time=time(18), end_time=time(19))
+        foreign_pending = Lesson.objects.create(group=self.group_b, date=self.today, start_time=time(0), end_time=time(0, 1))
         self.client.force_login(self.teacher_a_user)
         response = self.client.get(reverse("dashboard"))
         self.assertEqual(response.status_code, 200)
@@ -454,7 +477,7 @@ class DashboardSchedulingTests(CalendarSchedulingBase):
         self.assertNotIn(foreign_pending.pk, pending)
         recent = [l.pk for l in response.context["recent_lessons"]]
         self.assertIn(past_lesson.pk, recent)
-        self.assertContains(response, "Ожидают отметки посещаемости")
+        self.assertContains(response, "уже прошедших занятиях")
         self.assertNotContains(response, self.group_b.name)
 
     def test_teacher_dashboard_has_no_tjs(self):

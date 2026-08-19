@@ -13,8 +13,10 @@ from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 
-from .models import Lesson, LessonStatus
+from .materialize import reconcile_occurrence
+from .models import Lesson
 
 
 class LessonGenerationResult:
@@ -52,7 +54,8 @@ def _probe_lesson(schedule, lesson_date):
         date=lesson_date,
         start_time=schedule.start_time,
         end_time=schedule.end_time,
-        status=LessonStatus.SCHEDULED,
+        occurrence_date=lesson_date,
+        teacher=schedule.group.teacher,
     )
 
 
@@ -71,30 +74,50 @@ def _validate_window(schedule, date_from, date_to) -> None:
         raise ValidationError("Нельзя генерировать занятия по неактивному расписанию.")
 
 
+@transaction.atomic
 def preview_lessons(schedule, date_from, date_to) -> LessonGenerationResult:
-    """Count what generate_lessons() would do without writing anything."""
+    """Dry-run the authoritative reconciler and roll back every write."""
     _validate_window(schedule, date_from, date_to)
-    existing = _existing_dates(schedule, date_from, date_to)
     result = LessonGenerationResult()
-    for lesson_date in scheduled_dates(schedule, date_from, date_to):
+    bounded_from = max(date_from, schedule.start_date) if schedule.start_date else date_from
+    bounded_to = min(date_to, schedule.end_date) if schedule.end_date else date_to
+    if bounded_from > bounded_to:
+        return result
+    for lesson_date in scheduled_dates(schedule, bounded_from, bounded_to):
         result.total += 1
-        if lesson_date in existing:
-            result.skipped += 1
-        elif _would_conflict(schedule, lesson_date):
+        existed = Lesson.objects.filter(schedule=schedule).filter(
+            Q(occurrence_date=lesson_date) | Q(occurrence_date__isnull=True, date=lesson_date)
+        ).exists()
+        lesson = reconcile_occurrence(schedule, lesson_date)
+        if lesson is None:
             result.conflicts += 1
+        elif existed:
+            result.skipped += 1
         else:
             result.created += 1
+    transaction.set_rollback(True)
     return result
 
 
 @transaction.atomic
 def generate_lessons(schedule, date_from, date_to) -> LessonGenerationResult:
-    """Create one Lesson per schedule occurrence in the window (idempotent)."""
-    result = preview_lessons(schedule, date_from, date_to)
-    if result.created:
-        existing = _existing_dates(schedule, date_from, date_to)
-        for lesson_date in scheduled_dates(schedule, date_from, date_to):
-            if lesson_date in existing or _would_conflict(schedule, lesson_date):
-                continue
-            _probe_lesson(schedule, lesson_date).save()
+    """Reconcile occurrences using the same engine as calendar materialization."""
+    _validate_window(schedule, date_from, date_to)
+    bounded_from = max(date_from, schedule.start_date) if schedule.start_date else date_from
+    bounded_to = min(date_to, schedule.end_date) if schedule.end_date else date_to
+    result = LessonGenerationResult()
+    if bounded_from > bounded_to:
+        return result
+    for lesson_date in scheduled_dates(schedule, bounded_from, bounded_to):
+        result.total += 1
+        existed = Lesson.objects.filter(schedule=schedule).filter(
+            Q(occurrence_date=lesson_date) | Q(occurrence_date__isnull=True, date=lesson_date)
+        ).exists()
+        lesson = reconcile_occurrence(schedule, lesson_date)
+        if lesson is None:
+            result.conflicts += 1
+        elif existed:
+            result.skipped += 1
+        else:
+            result.created += 1
     return result

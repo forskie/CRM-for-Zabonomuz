@@ -143,7 +143,7 @@ class AttendanceTestCase(TestCase):
         Attendance.objects.create(lesson=self.lesson, student=self.student, status=AttendanceStatus.LATE, note="Опоздал на 10 минут")
         self.client.force_login(self.admin)
         response = self.client.get(reverse("education:student-detail", args=[self.student.pk]))
-        self.assertContains(response, "Attendance history")
+        self.assertContains(response, "История посещаемости")
         self.assertContains(response, "Опоздал на 10 минут")
         self.assertContains(response, "Опоздал")
 

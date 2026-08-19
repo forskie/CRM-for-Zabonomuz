@@ -4,7 +4,7 @@
 <div class="page-head">
   <div class="page-head__main">
     <h1 class="page-title">Группы</h1>
-    <p class="page-sub">Учебные группы, расписание и наполняемость</p>
+    <p class="page-sub">{{ page_obj.paginator.count }} групп — расписание и наполняемость</p>
   </div>
   {% if user.role != 'TEACHER' %}
     <div class="page-actions">
@@ -52,7 +52,7 @@
             <th>Курс</th>
             <th>Преподаватель</th>
             <th>Активных учеников</th>
-            <th>Стоимость</th>
+            {% if user.role != 'TEACHER' %}<th>Стоимость</th>{% endif %}
             <th>Статус</th>
           </tr>
         </thead>
@@ -63,7 +63,7 @@
               <td>{{ group.course }}</td>
               <td>{{ group.teacher }}</td>
               <td class="mono">{{ group.active_students_count }}</td>
-              <td class="mono">{{ group.monthly_fee }} TJS</td>
+              {% if user.role != 'TEACHER' %}<td class="mono">{{ group.monthly_fee }} TJS</td>{% endif %}
               <td><span class="badge badge--{{ group.status|lower }}">{{ group.get_status_display }}</span></td>
             </tr>
           {% empty %}
@@ -74,7 +74,8 @@
                   {% if has_filters %}
                     <div class="empty-state__title">По заданным фильтрам ничего не найдено.</div>
                   {% else %}
-                    <div class="empty-state__title">Ничего не найдено.</div>
+                    <div class="empty-state__title">Групп пока нет.</div>
+                    {% if user.role != 'TEACHER' %}<div class="empty-state__text">Создайте первую группу, чтобы добавить учеников и расписание.</div>{% endif %}
                   {% endif %}
                 </div>
               </td>

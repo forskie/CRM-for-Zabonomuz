@@ -112,11 +112,11 @@ class PaymentTestCase(TestCase):
         self._payment()
         self.client.force_login(self.teacher_user)
         response = self.client.get(reverse("education:student-detail", args=[self.student.pk]))
-        self.assertContains(response, "Attendance history")
+        self.assertContains(response, "История посещаемости")
         self.assertNotContains(response, "Добавить оплату")
         response = self.client.get(reverse("education:group-detail", args=[self.group.pk]))
         self.assertNotContains(response, "Оплачено")
-        self.assertNotContains(response, "Payments")
+        self.assertNotContains(response, "Платежи")
 
     def test_teacher_direct_url_is_blocked(self):
         payment = self._payment()
@@ -166,7 +166,7 @@ class PaymentTestCase(TestCase):
         self._payment(amount=Decimal("999.00"), paid_at=date(2026, 6, 1), period=date(2026, 6, 1), status=PaymentStatus.CANCELLED)
         self.client.force_login(self.admin)
         response = self.client.get(reverse("education:group-detail", args=[self.group.pk]))
-        self.assertContains(response, "Payments (3)")
+        self.assertContains(response, "Операций: 3")
         self.assertContains(response, "500,00 TJS")
 
     def test_multiple_payments_per_period_allowed(self):

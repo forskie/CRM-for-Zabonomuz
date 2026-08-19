@@ -6,6 +6,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from apps.accounts.models import UserRole
 
@@ -220,7 +221,7 @@ class LessonRescheduleForm(forms.Form):
         if lesson_date and start and end:
             if Lesson.objects.filter(group=lesson.group, date=lesson_date, start_time=start).exclude(pk=lesson.pk).exists():
                 self.add_error("start_time", "В этот день в это время уже есть занятие этой группы.")
-            probe = Lesson(group=lesson.group, schedule=lesson.schedule, date=lesson_date, start_time=start, end_time=end, status=lesson.status)
+            probe = Lesson(group=lesson.group, schedule=lesson.schedule, teacher=lesson.teacher, date=lesson_date, start_time=start, end_time=end, status=lesson.status)
             try:
                 probe.full_clean()
             except ValidationError as exc:
@@ -250,7 +251,11 @@ class LessonForm(forms.ModelForm):
         if start and end and start >= end:
             self.add_error("end_time", "Время окончания должно быть позже времени начала.")
         if group and lesson_date and start and end:
-            conflicts = Lesson.objects.filter(group__teacher=group.teacher, date=lesson_date).exclude(status=LessonStatus.CANCELLED).filter(start_time__lt=end, end_time__gt=start).exclude(pk=self.instance.pk)
+            conflicts = Lesson.objects.filter(date=lesson_date).exclude(status=LessonStatus.CANCELLED).filter(
+                Q(teacher=group.teacher) | Q(teacher__isnull=True, group__teacher=group.teacher),
+                start_time__lt=end,
+                end_time__gt=start,
+            ).exclude(pk=self.instance.pk)
             if conflicts.exists():
                 self.add_error("start_time", "Занятие пересекается с другим занятием этого преподавателя.")
             if Lesson.objects.filter(group=group, date=lesson_date, start_time=start).exclude(pk=self.instance.pk).exists():
@@ -297,7 +302,15 @@ class LessonFromScheduleForm(forms.Form):
         return cleaned
 
     def save(self):
-        lesson = Lesson(group=self.schedule.group, schedule=self.schedule, date=self.cleaned_data["date"], start_time=self.schedule.start_time, end_time=self.schedule.end_time)
+        lesson = Lesson(
+            group=self.schedule.group,
+            schedule=self.schedule,
+            occurrence_date=self.cleaned_data["date"],
+            teacher=self.schedule.group.teacher,
+            date=self.cleaned_data["date"],
+            start_time=self.schedule.start_time,
+            end_time=self.schedule.end_time,
+        )
         lesson.full_clean()
         lesson.save()
         return lesson
@@ -317,8 +330,19 @@ class AttendanceBulkForm(forms.Form):
         records = {record.student_id: record for record in existing}
         for student_id, student in sorted(students.items(), key=lambda item: item[1].full_name):
             record = records.get(student_id)
-            self.fields[f"status_{student_id}"] = forms.ChoiceField(choices=[("", "Не отмечено")] + list(AttendanceStatus.choices), required=False, initial=record.status if record else "", label=student.full_name)
-            self.fields[f"note_{student_id}"] = forms.CharField(required=False, initial=record.note if record else "", label="Примечание")
+            self.fields[f"status_{student_id}"] = forms.ChoiceField(
+                choices=[("", "Не отмечено")] + list(AttendanceStatus.choices),
+                required=False,
+                initial=record.status if record else "",
+                label=student.full_name,
+                widget=forms.Select(attrs={"class": "attendance-status"}),
+            )
+            self.fields[f"note_{student_id}"] = forms.CharField(
+                required=False,
+                initial=record.note if record else "",
+                label="Примечание",
+                widget=forms.TextInput(attrs={"class": "attendance-note"}),
+            )
 
     def rows(self):
         """Yield (student, status_field, note_field) triplets for a table layout."""
@@ -349,10 +373,11 @@ class PaymentForm(forms.ModelForm):
 
     class Meta:
         model = Payment
-        fields = ("student", "group", "amount", "paid_at", "period", "note")
+        fields = ("student", "group", "amount", "paid_at", "period", "status", "note")
         widgets = {
             "paid_at": forms.DateInput(attrs={"type": "date"}),
-            "period": forms.DateInput(attrs={"type": "date"}),
+            "period": forms.DateInput(attrs={"type": "month"}, format="%Y-%m"),
+            "note": forms.Textarea(attrs={"rows": 3, "placeholder": "Необязательно"}),
         }
         labels = {
             "student": "Ученик",
@@ -360,21 +385,46 @@ class PaymentForm(forms.ModelForm):
             "amount": "Сумма (TJS)",
             "paid_at": "Дата оплаты",
             "period": "Период (месяц)",
+            "status": "Статус",
             "note": "Заметка",
+        }
+        help_texts = {
+            "paid_at": "Дата, когда деньги фактически были получены.",
+            "period": "Месяц обучения, за который внесена оплата.",
         }
 
     def __init__(self, *args, student=None, group=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fixed_student = student
         self.fixed_group = group
+        self.fields["status"].required = False
+        self.fields["period"].input_formats = ["%Y-%m", "%Y-%m-%d"]
+        if not self.is_bound and not self.instance.pk:
+            today = timezone.localdate()
+            self.initial.setdefault("paid_at", today)
+            self.initial.setdefault("period", today.replace(day=1))
+            self.initial.setdefault("status", PaymentStatus.PAID)
         if student is not None:
             self.fields["student"].disabled = True
             self.fields["student"].initial = student
             self.fields["group"].queryset = Group.objects.filter(enrollments__student=student).distinct()
+            active_groups = list(Group.objects.filter(
+                enrollments__student=student,
+                enrollments__status=EnrollmentStatus.ACTIVE,
+                status="ACTIVE",
+            ).distinct()[:2])
+            if not self.is_bound and not self.instance.pk and len(active_groups) == 1:
+                self.initial["group"] = active_groups[0]
+                self.initial["amount"] = active_groups[0].monthly_fee
         if group is not None:
             self.fields["group"].disabled = True
             self.fields["group"].initial = group
             self.fields["student"].queryset = Student.objects.filter(enrollments__group=group).distinct()
+            if not self.is_bound and not self.instance.pk:
+                self.initial["amount"] = group.monthly_fee
+
+    def clean_status(self):
+        return self.cleaned_data.get("status") or PaymentStatus.PAID
 
     def clean_period(self):
         period = self.cleaned_data["period"]
@@ -400,9 +450,7 @@ class PaymentForm(forms.ModelForm):
 
 
 class PaymentEditForm(PaymentForm):
-    class Meta(PaymentForm.Meta):
-        fields = ("student", "group", "amount", "paid_at", "period", "status", "note")
-        labels = {**PaymentForm.Meta.labels, "status": "Статус"}
+    pass
 
 
 class ScheduleOverrideForm(forms.ModelForm):

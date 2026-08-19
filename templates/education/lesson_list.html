@@ -4,7 +4,7 @@
 <div class="page-head">
   <div class="page-head__main">
     <h1 class="page-title">Занятия</h1>
-    <p class="page-sub">Журнал занятий и посещаемости</p>
+    <p class="page-sub">{{ page_obj.paginator.count }} занятий по выбранным условиям</p>
   </div>
   {% if user.role != 'TEACHER' %}
     <div class="page-actions">
@@ -35,8 +35,14 @@
       <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
     {% endfor %}
   </select>
-  <input type="date" name="date_from" value="{{ date_from }}">
-  <input type="date" name="date_to" value="{{ date_to }}">
+  <div class="crm-datetime-wrap" data-crm-mode="date">
+    <input type="text" class="crm-datetime-input" value="{{ date_from }}" placeholder="Дата от..." readonly autocomplete="off" aria-label="Дата от">
+    <input type="hidden" name="date_from" value="{{ date_from }}">
+  </div>
+  <div class="crm-datetime-wrap" data-crm-mode="date">
+    <input type="text" class="crm-datetime-input" value="{{ date_to }}" placeholder="Дата до..." readonly autocomplete="off" aria-label="Дата до">
+    <input type="hidden" name="date_to" value="{{ date_to }}">
+  </div>
   <button type="submit" class="btn">Фильтровать</button>
 </form>
 {% endif %}
@@ -63,7 +69,7 @@
               <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
               <td>{{ lesson.group }}</td>
               <td>{{ lesson.group.course }}</td>
-              <td>{{ lesson.group.teacher }}</td>
+              <td>{{ lesson.effective_teacher }}</td>
               <td><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></td>
               <td class="mono">{{ lesson.attendance_marked }} / {{ lesson.group_active_students }}</td>
             </tr>
@@ -75,7 +81,8 @@
                   {% if has_filters %}
                     <div class="empty-state__title">По заданным фильтрам ничего не найдено.</div>
                   {% else %}
-                    <div class="empty-state__title">Ничего не найдено.</div>
+                    <div class="empty-state__title">Занятий пока нет.</div>
+                    {% if user.role != 'TEACHER' %}<div class="empty-state__text">Создайте занятие или настройте расписание группы.</div>{% endif %}
                   {% endif %}
                 </div>
               </td>

@@ -4,7 +4,7 @@
 <div class="page-head">
   <div class="page-head__main">
     <h1 class="page-title">Преподаватели</h1>
-    <p class="page-sub">Штат преподавателей центра</p>
+    <p class="page-sub">{{ page_obj.paginator.count }} преподавателей в выбранном списке</p>
   </div>
   {% if user.role != "TEACHER" %}
     <div class="page-actions">
@@ -57,7 +57,8 @@
                   {% if has_filters %}
                     <div class="empty-state__title">По заданным фильтрам ничего не найдено.</div>
                   {% else %}
-                    <div class="empty-state__title">Ничего не найдено.</div>
+                    <div class="empty-state__title">Преподавателей пока нет.</div>
+                    {% if user.role != 'TEACHER' %}<div class="empty-state__text">Добавьте первого преподавателя кнопкой вверху страницы.</div>{% endif %}
                   {% endif %}
                 </div>
               </td>

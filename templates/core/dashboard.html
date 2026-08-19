@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — CRM центра{% endblock %}
+{% block title %}Главная панель — CRM центра{% endblock %}
 {% block content %}
+<div class="dashboard-page">
 
 <div class="dash-header">
   <div class="dash-header__main">
-    <h1 class="dash-header__title">Dashboard</h1>
+    <h1 class="dash-header__title">Главная панель</h1>
     <p class="dash-header__sub">{{ today_display }}</p>
   </div>
 </div>
@@ -48,7 +49,7 @@
       {% include "partials/icon.html" with icon="check-circle" %}
     </div>
     <div class="dash-kpi-card__body">
-      <span class="dash-kpi-card__label">Посещаемость</span>
+      <span class="dash-kpi-card__label">Присутствовали от ожидаемых</span>
       {% if attendance_rate is not None %}
         <span class="dash-kpi-card__value">{{ attendance_rate }}%</span>
         <div class="dash-kpi-card__bar">
@@ -66,7 +67,7 @@
       {% include "partials/icon.html" with icon="credit-card" %}
     </div>
     <div class="dash-kpi-card__body">
-      <span class="dash-kpi-card__label">Оплачено за {{ period_start|date:"F" }}</span>
+      <span class="dash-kpi-card__label">Получено за {{ period_start|date:"F" }}</span>
       <span class="dash-kpi-card__value">{{ payments_total }} TJS</span>
     </div>
   </a>
@@ -80,11 +81,11 @@
   </div>
   <div class="dash-alert__body">
     <strong>Требует внимания</strong>
-    <span>{{ pending_attendance_count }} {{ pending_attendance_count|pluralize:"занятие требует,занятия требуют,занятий требуют" }} отметки посещаемости</span>
-    <span>Отметьте посещаемость в завершённых уроках</span>
+    <span>{{ pending_attendance_count }} {{ pending_attendance_count|pluralize:"занятие требует,занятия требуют" }} отметки посещаемости</span>
+    <span>Отметьте посещаемость в уже прошедших занятиях</span>
   </div>
-  <a href="{% url 'education:calendar' %}" class="btn btn--sm btn--warning">
-    Открыть календарь
+  <a href="{% url 'education:lesson-detail' attendance_pending.0.pk %}" class="btn btn--sm btn--warning">
+    Открыть занятие
   </a>
 </div>
 {% else %}
@@ -248,6 +249,14 @@
                 <span class="dash-att-summary__dot dash-att-summary__dot--late"></span>
                 <span>{{ attendance_late }} опозданий</span>
               </div>
+              <div class="dash-att-summary__stat">
+                <span>{{ attendance_marked }} из {{ attendance_expected }} отмечено ({{ attendance_completion_rate }}%)</span>
+              </div>
+              {% if attendance_unmarked %}
+              <div class="dash-att-summary__stat">
+                <span>{{ attendance_unmarked }} не отмечено</span>
+              </div>
+              {% endif %}
             </div>
           </div>
         {% else %}
@@ -366,5 +375,5 @@
   </div>{# /dash-secondary #}
 
 </div>{# /dash-grid #}
-
+</div>{# /dashboard-page #}
 {% endblock %}

@@ -239,6 +239,14 @@ class Lesson(models.Model):
     end_time = models.TimeField()
     status = models.CharField(max_length=16, choices=LessonStatus.choices, default=LessonStatus.SCHEDULED, db_index=True)
     schedule = models.ForeignKey(Schedule, on_delete=models.SET_NULL, null=True, blank=True, related_name="lessons")
+    occurrence_date = models.DateField(null=True, blank=True, db_index=True)
+    teacher = models.ForeignKey(
+        Teacher,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="assigned_lessons",
+    )
     source = models.CharField(max_length=16, choices=[("NORMAL", "Расписание"), ("OVERRIDE", "Исключение")], default="NORMAL", db_index=True)
     topic = models.CharField(max_length=255, blank=True)
     teacher_note = models.TextField(blank=True)
@@ -250,22 +258,54 @@ class Lesson(models.Model):
         ordering = ("date", "start_time")
         constraints = [
             models.UniqueConstraint(fields=("group", "date", "start_time"), name="unique_lesson_group_date_time"),
-            models.UniqueConstraint(fields=("schedule", "date"), condition=Q(schedule__isnull=False), name="unique_lesson_schedule_date"),
+            models.UniqueConstraint(
+                fields=("schedule", "occurrence_date"),
+                condition=Q(schedule__isnull=False, occurrence_date__isnull=False),
+                name="unique_lesson_schedule_occurrence",
+            ),
         ]
 
     def clean(self) -> None:
         errors = {}
+        if self.schedule_id and self.group_id and self.schedule.group_id != self.group_id:
+            errors["schedule"] = "Расписание должно принадлежать группе занятия."
+        if self.schedule_id and self.occurrence_date is None:
+            self.occurrence_date = self.date
+        if self.group_id and self.teacher_id is None:
+            self.teacher = self.group.teacher
         if self.start_time and self.end_time and self.start_time >= self.end_time:
             errors["end_time"] = "Время окончания должно быть позже времени начала."
         if self.status != LessonStatus.CANCELLED and self.group_id and self.date and self.start_time and self.end_time:
-            conflicts = Lesson.objects.filter(group__teacher=self.group.teacher, date=self.date).exclude(status=LessonStatus.CANCELLED).filter(start_time__lt=self.end_time, end_time__gt=self.start_time).exclude(pk=self.pk)
+            teacher_id = self.teacher_id or self.group.teacher_id
+            conflicts = Lesson.objects.filter(date=self.date).exclude(status=LessonStatus.CANCELLED).filter(
+                Q(teacher_id=teacher_id) | Q(teacher__isnull=True, group__teacher_id=teacher_id),
+                start_time__lt=self.end_time,
+                end_time__gt=self.start_time,
+            ).exclude(pk=self.pk)
             if conflicts.exists():
                 errors["start_time"] = "Занятие пересекается с другим занятием этого преподавателя."
+            group_conflicts = Lesson.objects.filter(
+                group_id=self.group_id,
+                date=self.date,
+                start_time__lt=self.end_time,
+                end_time__gt=self.start_time,
+            ).exclude(status=LessonStatus.CANCELLED).exclude(pk=self.pk)
+            if group_conflicts.exists():
+                errors["start_time"] = "Занятие пересекается с другим занятием этой группы."
         if errors:
             raise ValidationError(errors)
 
     def active_students(self):
-        return Student.objects.filter(enrollments__group=self.group, enrollments__status=EnrollmentStatus.ACTIVE).distinct()
+        return Student.objects.filter(
+            enrollments__group=self.group,
+            enrollments__started_at__lte=self.date,
+        ).filter(
+            Q(enrollments__ended_at__isnull=True) | Q(enrollments__ended_at__gte=self.date)
+        ).distinct()
+
+    @property
+    def effective_teacher(self):
+        return self.teacher or self.group.teacher
 
     def __str__(self) -> str:
         return f"{self.group} — {self.date} {self.start_time}"
@@ -293,9 +333,15 @@ class Attendance(models.Model):
         errors = {}
         if self.lesson_id and self.lesson.status == LessonStatus.CANCELLED:
             errors["lesson"] = "Нельзя изменять посещаемость отменённого занятия."
-        # Only creation depends on the current active enrollment. Existing records are history.
+        # Only creation checks membership on the lesson date. Existing records are history.
         if not self.pk and self.lesson_id and self.student_id:
-            eligible = Enrollment.objects.filter(student=self.student, group=self.lesson.group, status=EnrollmentStatus.ACTIVE).exists()
+            eligible = Enrollment.objects.filter(
+                student=self.student,
+                group=self.lesson.group,
+                started_at__lte=self.lesson.date,
+            ).filter(
+                Q(ended_at__isnull=True) | Q(ended_at__gte=self.lesson.date)
+            ).exists()
             if not eligible:
                 errors["student"] = "Ученик не имеет активного зачисления в группу занятия."
         if errors:

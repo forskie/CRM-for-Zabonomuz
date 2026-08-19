@@ -4,7 +4,7 @@
 <div class="page-head">
   <div class="page-head__main">
     <h1 class="page-title">Ученики</h1>
-    <p class="page-sub">Реестр обучающихся и их текущий статус</p>
+    <p class="page-sub">{{ page_obj.paginator.count }} учеников в выбранном списке</p>
   </div>
   {% if user.role != "TEACHER" %}
     <div class="page-actions">
@@ -56,7 +56,8 @@
                   {% if has_filters %}
                     <div class="empty-state__title">По заданным фильтрам ничего не найдено.</div>
                   {% else %}
-                    <div class="empty-state__title">Ничего не найдено.</div>
+                    <div class="empty-state__title">Учеников пока нет.</div>
+                    {% if user.role != 'TEACHER' %}<div class="empty-state__text">Добавьте первого ученика кнопкой вверху страницы.</div>{% endif %}
                   {% endif %}
                 </div>
               </td>

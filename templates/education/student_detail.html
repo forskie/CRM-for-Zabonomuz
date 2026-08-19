@@ -11,11 +11,12 @@
   </div>
   {% if user.role != "TEACHER" %}
     <div class="page-actions">
+      <a href="{% url 'education:student-payment-create' student.pk %}" class="btn btn--primary">Добавить оплату</a>
       <a href="{% url 'education:student-edit' student.pk %}" class="btn">Редактировать</a>
       {% if student.status == 'ACTIVE' %}
         <form class="inline-form" method="post" action="{% url 'education:student-status' student.pk 'ARCHIVED' %}">
           {% csrf_token %}
-          <button type="submit" class="btn btn--ghost">Архивировать</button>
+          <button type="submit" class="btn btn--ghost" data-confirm="Архивировать ученика? Он исчезнет из активных списков.">Архивировать</button>
         </form>
       {% else %}
         <form class="inline-form" method="post" action="{% url 'education:student-status' student.pk 'ACTIVE' %}">
@@ -39,7 +40,7 @@
 
 <section class="panel">
   <div class="panel__head">
-    <h2 class="panel__title">Active enrollments</h2>
+    <h2 class="panel__title">Активные зачисления</h2>
   </div>
   <div class="panel__body panel__body--tight">
     <div class="table-wrap">
@@ -77,7 +78,7 @@
 
 <section class="panel">
   <div class="panel__head">
-    <h2 class="panel__title">History</h2>
+    <h2 class="panel__title">История</h2>
   </div>
   <div class="panel__body panel__body--tight">
     <div class="table-wrap">
@@ -109,7 +110,7 @@
 
 <section class="panel">
   <div class="panel__head">
-    <h2 class="panel__title">Attendance history</h2>
+    <h2 class="panel__title">История посещаемости</h2>
   </div>
   <div class="panel__body panel__body--tight">
     <div class="table-wrap">
@@ -140,10 +141,17 @@
 </section>
 
 {% if user.role != 'TEACHER' %}
-<section class="panel">
+<section class="panel finance-summary">
   <div class="panel__head">
-    <h2 class="panel__title">Payments</h2>
-    <a href="{% url 'education:student-payment-create' student.pk %}" class="btn btn--sm btn--primary">Добавить оплату</a>
+    <div><h2 class="panel__title">Оплаты ученика</h2><p class="panel__subtitle">Фактически полученные оплаты без расчёта задолженности</p></div>
+    <form method="get" class="period-picker"><label for="student-finance-month">Месяц получения</label><input id="student-finance-month" type="month" name="finance_month" value="{{ finance_month|date:'Y-m' }}"><button class="btn btn--sm" type="submit">Показать</button></form>
+  </div>
+  <div class="panel__body">
+    <div class="summary-strip">
+      <div class="summary-item"><span>Получено за месяц</span><strong>{{ finance_received }} TJS</strong></div>
+      <div class="summary-item"><span>Оплат</span><strong>{{ finance_payment_count }}</strong></div>
+      <div class="summary-item"><span>Последняя оплата</span><strong>{% if last_paid_payment %}{{ last_paid_payment.paid_at }}{% else %}—{% endif %}</strong></div>
+    </div>
   </div>
   <div class="panel__body panel__body--tight">
     <div class="table-wrap">
@@ -167,7 +175,7 @@
               <td><a href="{% url 'education:payment-detail' payment.pk %}"><span class="badge badge--{{ payment.status|lower }}">{{ payment.get_status_display }}</span></a></td>
             </tr>
           {% empty %}
-            <tr><td colspan="5" class="table-empty">Нет оплат.</td></tr>
+            <tr><td colspan="5" class="table-empty">Оплат пока нет. Новую оплату можно добавить кнопкой вверху страницы.</td></tr>
           {% endfor %}
         </tbody>
       </table>

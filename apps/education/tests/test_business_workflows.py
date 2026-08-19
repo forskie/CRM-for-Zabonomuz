@@ -347,3 +347,50 @@ class QueryCountStabilityTests(BusinessWorkflowBase):
             Group.objects.create(name=f"Группа {i}", course=Course.objects.first(), teacher=self.teacher, monthly_fee=Decimal("300.00"))
         large = self._queries(reverse("education:group-list"))
         self.assertLess(large - small, 5)
+
+
+class GroupAttendanceStatsRegressionTests(TestCase):
+    """Group detail attendance_stats must exclude CANCELLED lessons from denominator."""
+
+    password = "Secure-test-password-2026"
+
+    def setUp(self):
+        self.owner = User.objects.create_user("owner", password=self.password, role=UserRole.OWNER)
+        self.teacher = User.objects.create_user("teacher", password=self.password, role=UserRole.TEACHER).teacher_profile
+        course = Course.objects.create(name="English", default_monthly_fee=Decimal("300.00"))
+        self.group = Group.objects.create(name="English A1", course=course, teacher=self.teacher, monthly_fee=Decimal("300.00"))
+        self.student = Student.objects.create(full_name="Тест Ученик", phone="900100001")
+        Enrollment.objects.create(student=self.student, group=self.group, started_at=date(2026, 8, 1))
+
+    def _get_stats(self):
+        self.client.force_login(self.owner)
+        resp = self.client.get(reverse("education:group-detail", args=[self.group.pk]))
+        return resp.context["attendance_stats"]
+
+    def test_cancelled_lesson_not_counted_in_denominator(self):
+        l1 = Lesson.objects.create(group=self.group, date=date(2026, 8, 10), start_time=time(9), end_time=time(10))
+        Lesson.objects.create(group=self.group, date=date(2026, 8, 12), start_time=time(9), end_time=time(10), status=LessonStatus.CANCELLED)
+        Attendance.objects.create(lesson=l1, student=self.student, status=AttendanceStatus.PRESENT)
+        stats = self._get_stats()
+        self.assertEqual(stats["lessons"], 1)
+        self.assertEqual(stats["present"], 1)
+
+    def test_all_cancelled_zero_lessons(self):
+        Lesson.objects.create(group=self.group, date=date(2026, 8, 10), start_time=time(9), end_time=time(10), status=LessonStatus.CANCELLED)
+        stats = self._get_stats()
+        self.assertEqual(stats["lessons"], 0)
+        self.assertEqual(stats["present"], 0)
+
+    def test_mixed_statuses_correct_counts(self):
+        l1 = Lesson.objects.create(group=self.group, date=date(2026, 8, 10), start_time=time(9), end_time=time(10))
+        l2 = Lesson.objects.create(group=self.group, date=date(2026, 8, 11), start_time=time(9), end_time=time(10))
+        l3 = Lesson.objects.create(group=self.group, date=date(2026, 8, 12), start_time=time(9), end_time=time(10))
+        Lesson.objects.create(group=self.group, date=date(2026, 8, 13), start_time=time(9), end_time=time(10), status=LessonStatus.CANCELLED)
+        Attendance.objects.create(lesson=l1, student=self.student, status=AttendanceStatus.PRESENT)
+        Attendance.objects.create(lesson=l2, student=self.student, status=AttendanceStatus.LATE)
+        Attendance.objects.create(lesson=l3, student=self.student, status=AttendanceStatus.ABSENT)
+        stats = self._get_stats()
+        self.assertEqual(stats["lessons"], 3)
+        self.assertEqual(stats["present"], 1)
+        self.assertEqual(stats["late"], 1)
+        self.assertEqual(stats["absent"], 1)

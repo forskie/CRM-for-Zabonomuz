@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 from unittest import mock
 
@@ -20,6 +20,7 @@ from apps.education.models import (
     Group,
     Lesson,
     LessonStatus,
+    RecordStatus,
     Schedule,
     Student,
 )
@@ -261,7 +262,7 @@ class TeacherDetailTests(Stage14RegressionBase):
         super().setUp()
         self.student = self._enrolled("Алиев Рустам", "900123456")
         self.schedule = Schedule.objects.create(group=self.group, weekday=0, start_time=time(18, 0), end_time=time(19, 0))
-        self.lesson = Lesson.objects.create(group=self.group, date=date(2026, 8, 18), start_time=time(18, 0), end_time=time(19, 0))
+        self.lesson = Lesson.objects.create(group=self.group, date=date.today() + timedelta(days=1), start_time=time(18, 0), end_time=time(19, 0))
 
     def test_admin_sees_groups_on_teacher_detail(self):
         self.login(self.owner)
@@ -347,6 +348,8 @@ class AuditCoverageTests(Stage14RegressionBase):
 
     def test_teacher_status_audited(self):
         self.login(self.owner)
+        self.group.status = RecordStatus.ARCHIVED
+        self.group.save(update_fields=("status",))
         self.client.post(reverse("education:teacher-status", args=[self.teacher.pk, "ARCHIVED"]))
         log = AuditLog.objects.latest("pk")
         self.assertEqual(log.action, AuditAction.TEACHER_STATUS)

@@ -11,10 +11,12 @@
   </div>
   {% if user.role != 'TEACHER' %}
     <div class="page-actions">
-      <a href="{% url 'education:group-edit' group.pk %}" class="btn">Редактировать</a>
       <a href="{% url 'education:enrollment-create' group.pk %}" class="btn btn--primary">
         {% include "partials/icon.html" with icon="plus" %}Добавить ученика
       </a>
+      <a href="{% url 'education:calendar' %}?group={{ group.pk }}" class="btn">Календарь</a>
+      <a href="{% url 'education:group-payment-create' group.pk %}" class="btn">Добавить оплату</a>
+      <a href="{% url 'education:group-edit' group.pk %}" class="btn btn--ghost">Изменить</a>
     </div>
   {% endif %}
 </div>
@@ -35,7 +37,7 @@
 <div class="grid-2">
   <section class="panel">
     <div class="panel__head">
-      <h2 class="panel__title">Schedule</h2>
+      <h2 class="panel__title">Расписание</h2>
       {% if user.role != 'TEACHER' %}
         <a href="{% url 'education:schedule-create' group.pk %}" class="btn btn--sm">Добавить</a>
       {% endif %}
@@ -43,8 +45,8 @@
     <div class="panel__body">
       <ul class="list">
         {% for schedule in schedules %}
-          <li class="list__item" style="flex-direction:column;align-items:stretch;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
+          <li class="list__item schedule-item">
+            <div class="schedule-item__main">
               <span class="list__main">
                 <strong>{{ schedule.get_weekday_display }}</strong>
                 <span class="mono text-muted">{{ schedule.start_time }}–{{ schedule.end_time }}</span>
@@ -60,7 +62,7 @@
                     <a href="{% url 'education:schedule-generate' schedule.pk %}" class="btn btn--sm btn--primary">Генерация</a>
                     <form class="inline-form" method="post" action="{% url 'education:schedule-deactivate' schedule.pk %}">
                       {% csrf_token %}
-                      <button type="submit" class="btn btn--sm btn--ghost">Деактивировать</button>
+                      <button type="submit" class="btn btn--sm btn--ghost" data-confirm="Остановить это расписание? Новые занятия по нему больше не будут создаваться.">Деактивировать</button>
                     </form>
                   {% endif %}
                   <a href="{% url 'education:lesson-from-schedule' schedule.pk %}" class="btn btn--sm">Создать занятие</a>
@@ -68,26 +70,26 @@
               {% endif %}
             </div>
             {% if schedule.overrides.all %}
-              <div style="margin-top:6px;padding-left:12px;border-left:2px solid var(--color-warning, #f59e0b);">
-                <span class="text-muted" style="font-size:0.85em;">Исключения:</span>
+              <div class="schedule-exceptions">
+                <span class="schedule-exceptions__label">Изменения расписания</span>
                 {% for ov in schedule.overrides.all %}
-                  <span class="badge badge--{{ ov.override_type|lower }}" style="font-size:0.8em;">
+                  <span class="badge badge--{{ ov.override_type|lower }} badge--compact">
                     {{ ov.date }}: {{ ov.get_override_type_display }}
                     {% if ov.new_date %}→ {{ ov.new_date }}{% endif %}
                     {% if ov.substitute_teacher %}({{ ov.substitute_teacher }}){% endif %}
                   </span>
                   {% if user.role != 'TEACHER' %}
-                    <a href="{% url 'education:override-edit' ov.pk %}" style="font-size:0.8em;">Изм.</a>
-                    <form class="inline-form" method="post" action="{% url 'education:override-delete' ov.pk %}" style="display:inline;">
+                    <a href="{% url 'education:override-edit' ov.pk %}" class="text-action">Изменить</a>
+                    <form class="inline-form" method="post" action="{% url 'education:override-delete' ov.pk %}">
                       {% csrf_token %}
-                      <button type="submit" style="font-size:0.8em;color:var(--color-danger, #ef4444);background:none;border:none;cursor:pointer;">Удал.</button>
+                      <button type="submit" class="text-action text-action--danger" data-confirm="Удалить это исключение расписания?">Удалить</button>
                     </form>
                   {% endif %}
                 {% endfor %}
               </div>
             {% endif %}
             {% if user.role != 'TEACHER' and schedule.is_active %}
-              <div style="margin-top:4px;padding-left:12px;">
+              <div class="schedule-item__foot">
                 <a href="{% url 'education:override-create' schedule.pk %}" class="btn btn--sm btn--ghost">+ Исключение</a>
               </div>
             {% endif %}
@@ -101,7 +103,7 @@
 
   <section class="panel">
     <div class="panel__head">
-      <h2 class="panel__title">Upcoming lessons</h2>
+      <h2 class="panel__title">Ближайшие занятия</h2>
     </div>
     <div class="panel__body">
       <ul class="list">
@@ -152,19 +154,16 @@
 {% if user.role != 'TEACHER' %}
 <section class="panel">
   <div class="panel__head">
-    <h2 class="panel__title">Payments ({{ payments|length }})</h2>
-    <a href="{% url 'education:group-payment-create' group.pk %}" class="btn btn--sm btn--primary">Добавить оплату</a>
+    <div><h2 class="panel__title">Оплаты группы</h2><p class="panel__subtitle">Операций: {{ payments_count }} — последние оплаты и поступления выбранного месяца</p></div>
+    <form method="get" class="period-picker"><label for="group-finance-month">Месяц получения</label><input id="group-finance-month" type="month" name="finance_month" value="{{ finance_month|date:'Y-m' }}"><button class="btn btn--sm" type="submit">Показать</button></form>
   </div>
   <div class="panel__body">
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-card__label">Платежей</div>
-        <div class="stat-card__value">{{ payments|length }}</div>
-      </div>
-      <div class="stat-card stat-card--success">
-        <div class="stat-card__label">Оплачено</div>
-        <div class="stat-card__value">{{ payments_total }} TJS</div>
-      </div>
+    <div class="summary-strip">
+      <div class="summary-item"><span>Стоимость в месяц</span><strong>{{ group.monthly_fee }} TJS</strong></div>
+      <div class="summary-item"><span>Активных учеников</span><strong>{{ active_enrollments|length }}</strong></div>
+      <div class="summary-item"><span>Оплат за месяц</span><strong>{{ paid_payments_count }}</strong></div>
+      <div class="summary-item summary-item--accent"><span>Получено за месяц</span><strong>{{ payments_total }} TJS</strong></div>
+      <div class="summary-item"><span>Получено за всё время</span><strong>{{ payments_lifetime_total }} TJS</strong></div>
     </div>
   </div>
   <div class="panel__body panel__body--tight">
@@ -189,7 +188,7 @@
               <td><a href="{% url 'education:payment-detail' payment.pk %}"><span class="badge badge--{{ payment.status|lower }}">{{ payment.get_status_display }}</span></a></td>
             </tr>
           {% empty %}
-            <tr><td colspan="5" class="table-empty">Нет оплат.</td></tr>
+            <tr><td colspan="5" class="table-empty">В этой группе пока нет оплат.</td></tr>
           {% endfor %}
         </tbody>
       </table>

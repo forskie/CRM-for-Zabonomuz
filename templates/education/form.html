@@ -42,4 +42,21 @@
     </form>
   </div>
 </div>
+{% if payment_group_fees %}
+  {{ payment_group_fees|json_script:"payment-group-fees" }}
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+{% if payment_group_fees %}<script>
+(function () {
+  var group = document.getElementById("id_group");
+  var amount = document.getElementById("id_amount");
+  var data = document.getElementById("payment-group-fees");
+  if (!group || !amount || !data) return;
+  var fees = JSON.parse(data.textContent);
+  group.addEventListener("change", function () {
+    if (!amount.value && fees[group.value]) amount.value = fees[group.value];
+  });
+})();
+</script>{% endif %}
 {% endblock %}

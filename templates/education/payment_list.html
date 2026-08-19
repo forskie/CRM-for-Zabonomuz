@@ -4,7 +4,7 @@
 <div class="page-head">
   <div class="page-head__main">
     <h1 class="page-title">Оплаты</h1>
-    <p class="page-sub">Журнал платежей по группам</p>
+    <p class="page-sub">{{ page_obj.paginator.count }} операций — полученные и отменённые оплаты</p>
   </div>
   <div class="page-actions">
     <a href="{% url 'education:payment-create' %}" class="btn btn--primary">
@@ -30,7 +30,7 @@
       <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
     {% endfor %}
   </select>
-  <input type="month" name="month" value="{{ selected_month }}">
+  <label class="toolbar__field"><span>Период обучения</span><input type="month" name="month" value="{{ selected_month }}"></label>
   <button type="submit" class="btn">Фильтровать</button>
 </form>
 
@@ -46,6 +46,7 @@
             <th>Период</th>
             <th>Сумма</th>
             <th>Статус</th>
+            <th>Заметка</th>
           </tr>
         </thead>
         <tbody>
@@ -57,16 +58,18 @@
               <td class="mono">{{ payment.period|date:"m.Y" }}</td>
               <td class="mono">{{ payment.amount }} TJS</td>
               <td><a href="{% url 'education:payment-detail' payment.pk %}"><span class="badge badge--{{ payment.status|lower }}">{{ payment.get_status_display }}</span></a></td>
+              <td class="text-muted">{{ payment.note|default:"—"|truncatechars:36 }}</td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="6">
+              <td colspan="7">
                 <div class="empty-state">
                   <div class="empty-state__icon">{% include "partials/icon.html" with icon="credit-card" %}</div>
                   {% if has_filters %}
                     <div class="empty-state__title">По заданным фильтрам ничего не найдено.</div>
                   {% else %}
-                    <div class="empty-state__title">Ничего не найдено.</div>
+                    <div class="empty-state__title">Оплат пока нет.</div>
+                    <div class="empty-state__text">Добавьте первую оплату кнопкой вверху страницы.</div>
                   {% endif %}
                 </div>
               </td>

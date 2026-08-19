@@ -4,13 +4,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}CRM центра{% endblock %}</title>
+  <title>{% block title %}Zabonomuz{% endblock %}</title>
   <script>
     (function () {
       var t = document.documentElement;
       var saved = null;
       try { saved = localStorage.getItem('crm-theme'); } catch (e) {}
-      var dark = saved === 'dark' || (saved === null && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      var dark = saved === 'dark';
       t.setAttribute('data-theme', dark ? 'dark' : 'light');
     })();
   </script>
@@ -30,6 +30,7 @@
 {% url 'education:payment-list' as payments_url %}
 {% url 'education:audit-list' as audit_url %}
 {% url 'accounts:user-list' as users_url %}
+{% url 'core:analytics' as analytics_url %}
 {% url 'accounts:logout' as logout_url %}
 
 <header class="topbar">
@@ -41,7 +42,7 @@
     {% endif %}
     <a class="brand" href="{{ dashboard_url }}">
       <span class="brand__logo">{% include "partials/icon.html" with icon="logo" %}</span>
-      CRM <span>центра</span>
+      <span class="brand__text">Zabonomuz<small>Учебный центр</small></span>
     </a>
   </div>
   <div class="topbar__right">
@@ -71,25 +72,28 @@
       <div class="sidebar__group">
         <span class="sidebar__label">Модули</span>
         <a class="nav-link {% if request.path == dashboard_url %}active{% endif %}" href="{{ dashboard_url }}">
-          {% include "partials/icon.html" with icon="dashboard" %}Dashboard
+          {% include "partials/icon.html" with icon="dashboard" %}Главная
         </a>
         <a class="nav-link {% if students_url in request.path %}active{% endif %}" href="{{ students_url }}">
-          {% include "partials/icon.html" with icon="user" %}Students
+          {% include "partials/icon.html" with icon="user" %}Ученики
         </a>
         <a class="nav-link {% if teachers_url in request.path %}active{% endif %}" href="{{ teachers_url }}">
-          {% include "partials/icon.html" with icon="users" %}Teachers
+          {% include "partials/icon.html" with icon="users" %}Преподаватели
         </a>
         <a class="nav-link {% if courses_url in request.path %}active{% endif %}" href="{{ courses_url }}">
-          {% include "partials/icon.html" with icon="book" %}Courses
+          {% include "partials/icon.html" with icon="book" %}Курсы
         </a>
         <a class="nav-link {% if groups_url in request.path %}active{% endif %}" href="{{ groups_url }}">
-          {% include "partials/icon.html" with icon="graduation" %}Groups
+          {% include "partials/icon.html" with icon="graduation" %}Группы
         </a>
         <a class="nav-link {% if calendar_url in request.path %}active{% endif %}" href="{{ calendar_url }}">
-          {% include "partials/icon.html" with icon="calendar" %}Calendar
+          {% include "partials/icon.html" with icon="calendar" %}Календарь
         </a>
         <a class="nav-link {% if lessons_url in request.path %}active{% endif %}" href="{{ lessons_url }}">
-          {% include "partials/icon.html" with icon="hash" %}Lessons
+          {% include "partials/icon.html" with icon="hash" %}Занятия
+        </a>
+        <a class="nav-link {% if request.path == analytics_url %}active{% endif %}" href="{{ analytics_url }}">
+          {% include "partials/icon.html" with icon="bar-chart" %}Аналитика
         </a>
       </div>
 
@@ -97,10 +101,10 @@
       <div class="sidebar__group">
         <span class="sidebar__label">Финансы и контроль</span>
         <a class="nav-link {% if payments_url in request.path %}active{% endif %}" href="{{ payments_url }}">
-          {% include "partials/icon.html" with icon="credit-card" %}Payments
+          {% include "partials/icon.html" with icon="credit-card" %}Оплаты
         </a>
         <a class="nav-link {% if audit_url in request.path %}active{% endif %}" href="{{ audit_url }}">
-          {% include "partials/icon.html" with icon="shield" %}Audit
+          {% include "partials/icon.html" with icon="shield" %}Аудит
         </a>
       </div>
       {% endif %}
@@ -109,7 +113,7 @@
       <div class="sidebar__group">
         <span class="sidebar__label">Администрирование</span>
         <a class="nav-link {% if users_url in request.path %}active{% endif %}" href="{{ users_url }}">
-          {% include "partials/icon.html" with icon="sliders" %}Users
+          {% include "partials/icon.html" with icon="sliders" %}Пользователи
         </a>
       </div>
       {% endif %}
@@ -161,5 +165,7 @@
     }
   })();
 </script>
+<script src="{% static 'js/crm-controls.js' %}"></script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

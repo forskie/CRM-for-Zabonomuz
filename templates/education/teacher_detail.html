@@ -14,7 +14,7 @@
       {% if teacher.status == 'ACTIVE' %}
         <form class="inline-form" method="post" action="{% url 'education:teacher-status' teacher.pk 'ARCHIVED' %}">
           {% csrf_token %}
-          <button type="submit" class="btn btn--ghost">Архивировать</button>
+          <button type="submit" class="btn btn--ghost" data-confirm="Архивировать преподавателя? Сначала убедитесь, что у него нет активных групп.">Архивировать</button>
         </form>
       {% else %}
         <form class="inline-form" method="post" action="{% url 'education:teacher-status' teacher.pk 'ACTIVE' %}">
@@ -23,6 +23,8 @@
         </form>
       {% endif %}
     </div>
+  {% else %}
+    <div class="page-actions"><a href="{% url 'education:calendar' %}?teacher={{ teacher.pk }}" class="btn btn--primary">Мои ближайшие занятия</a></div>
   {% endif %}
 </div>
 

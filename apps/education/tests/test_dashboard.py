@@ -95,7 +95,7 @@ class DashboardTestCase(TestCase):
 
     def test_multiple_payments_in_one_period_are_counted(self):
         response = self._get(self.owner)
-        self.assertEqual(response.context["payments_count"], 3)
+        self.assertEqual(response.context["payments_count"], 2)
         self.assertEqual(response.context["payments_total"], Decimal("500.00"))
 
     def test_attendance_counts_are_correct_for_owner(self):
@@ -301,7 +301,8 @@ class DashboardKPITests(TestCase):
     def test_attendance_rate_none_when_no_data(self):
         Attendance.objects.all().delete()
         response = self._get(self.owner)
-        self.assertIsNone(response.context["attendance_rate"])
+        self.assertEqual(response.context["attendance_rate"], 0)
+        self.assertEqual(response.context["attendance_completion_rate"], 0)
 
     def test_attendance_total_for_owner(self):
         response = self._get(self.owner)
@@ -387,3 +388,110 @@ class DashboardEmptyStatesTests(TestCase):
     def test_empty_action_required_ok(self):
         response = self._get()
         self.assertContains(response, "Всё в порядке")
+
+
+class DashboardRegressionTests(TestCase):
+    """Regression tests for root-cause fixes: payment paid_at vs period, archived teacher count."""
+
+    password = "Secure-test-password-2026"
+
+    def setUp(self):
+        self.owner = User.objects.create_user("owner", password=self.password, role=UserRole.OWNER)
+        course = Course.objects.create(name="English", default_monthly_fee=Decimal("300.00"))
+        self.teacher_user = User.objects.create_user("teacher", password=self.password, role=UserRole.TEACHER)
+        self.archived_teacher_user = User.objects.create_user("archived_t", password=self.password, role=UserRole.TEACHER)
+        self.archived_teacher_user.teacher_profile.status = RecordStatus.ARCHIVED
+        self.archived_teacher_user.teacher_profile.save(update_fields=("status",))
+        self.group = Group.objects.create(name="English A1", course=course, teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("350.00"))
+        self.student = Student.objects.create(full_name="Тест Ученик", phone="900900001")
+        Enrollment.objects.create(student=self.student, group=self.group, started_at=date(2026, 8, 1))
+        self.today = date.today()
+        self.period_start = self.today.replace(day=1)
+        self.last_month_start = (self.period_start - timedelta(days=1)).replace(day=1)
+
+    def _get(self, user=None):
+        self.client.force_login(user or self.owner)
+        return self.client.get(reverse("dashboard"))
+
+    def test_paid_at_current_month_counted_even_if_period_is_future(self):
+        Payment.objects.create(
+            student=self.student, group=self.group,
+            amount=Decimal("250.00"), paid_at=self.today,
+            period=self.period_start + timedelta(days=40),
+        )
+        response = self._get()
+        self.assertEqual(response.context["payments_total"], Decimal("250.00"))
+
+    def test_period_current_month_not_counted_if_paid_at_is_other_month(self):
+        Payment.objects.create(
+            student=self.student, group=self.group,
+            amount=Decimal("100.00"), paid_at=self.last_month_start,
+            period=self.period_start,
+        )
+        response = self._get()
+        self.assertEqual(response.context["payments_total"], Decimal("0.00"))
+
+    def test_cancelled_payment_excluded_regardless_of_paid_at(self):
+        Payment.objects.create(
+            student=self.student, group=self.group,
+            amount=Decimal("300.00"), paid_at=self.today,
+            period=self.period_start, status=PaymentStatus.CANCELLED,
+        )
+        response = self._get()
+        self.assertEqual(response.context["payments_total"], Decimal("0.00"))
+        self.assertEqual(response.context["payments_count"], 0)
+
+    def test_archived_teacher_not_counted(self):
+        response = self._get()
+        self.assertEqual(response.context["teachers_count"], 1)
+
+    def test_dashboard_attendance_only_current_month(self):
+        """Attendance stats must reflect current month only, not lifetime."""
+        from datetime import date as _date
+        today = _date.today()
+        period_start = today.replace(day=1)
+        last_month_start = (period_start - timedelta(days=1)).replace(day=1)
+        last_month_day = (period_start - timedelta(days=1))
+        self.client.force_login(self.owner)
+        other_group = Group.objects.create(
+            name="Math A1", course=Course.objects.first(),
+            teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("300.00"),
+        )
+        s1 = Student.objects.create(full_name="Прошлый Месяц", phone="900100001")
+        s2 = Student.objects.create(full_name="Текущий Месяц", phone="900100002")
+        e1 = Enrollment.objects.create(student=s1, group=other_group, started_at=last_month_start)
+        e2 = Enrollment.objects.create(student=s2, group=other_group, started_at=period_start)
+        lesson_last = Lesson.objects.create(group=other_group, date=last_month_day, start_time=time(9), end_time=time(10))
+        lesson_this = Lesson.objects.create(group=other_group, date=today, start_time=time(9), end_time=time(10))
+        Attendance.objects.create(lesson=lesson_last, student=s1, status=AttendanceStatus.PRESENT)
+        Attendance.objects.create(lesson=lesson_this, student=s2, status=AttendanceStatus.ABSENT)
+        response = self._get()
+        self.assertEqual(response.context["attendance_present"], 0)
+        self.assertEqual(response.context["attendance_absent"], 1)
+        self.assertEqual(response.context["attendance_late"], 0)
+
+    def test_dashboard_attendance_teacher_scoped(self):
+        """Teacher dashboard attendance must only count their own lessons, current month."""
+        from datetime import date as _date
+        today = _date.today()
+        period_start = today.replace(day=1)
+        self.client.force_login(self.teacher_user)
+        other_group = Group.objects.create(
+            name="Math A1", course=Course.objects.first(),
+            teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("300.00"),
+        )
+        other_group_2 = Group.objects.create(
+            name="Math B1", course=Course.objects.first(),
+            teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("300.00"),
+        )
+        s1 = Student.objects.create(full_name="Ученик Титч", phone="900200001")
+        Enrollment.objects.create(student=s1, group=other_group, started_at=period_start)
+        Enrollment.objects.create(student=s1, group=other_group_2, started_at=period_start)
+        l1 = Lesson.objects.create(group=other_group, date=today, start_time=time(9), end_time=time(10))
+        l2 = Lesson.objects.create(group=other_group_2, date=today, start_time=time(11), end_time=time(12))
+        Attendance.objects.create(lesson=l1, student=s1, status=AttendanceStatus.PRESENT)
+        Attendance.objects.create(lesson=l2, student=s1, status=AttendanceStatus.LATE)
+        response = self._get(user=self.teacher_user)
+        self.assertEqual(response.context["attendance_present"], 1)
+        self.assertEqual(response.context["attendance_late"], 1)
+        self.assertEqual(response.context["attendance_absent"], 0)

@@ -14,7 +14,7 @@
     {% if payment.status == 'PAID' %}
       <form class="inline-form" method="post" action="{% url 'education:payment-cancel' payment.pk %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn--ghost">Отменить</button>
+        <button type="submit" class="btn btn--danger" data-confirm="Отменить эту оплату? Сумма перестанет учитываться в финансовых итогах.">Отменить оплату</button>
       </form>
     {% endif %}
   </div>
@@ -25,8 +25,8 @@
     <dl class="dl">
       <dt>Ученик</dt><dd><a href="{% url 'education:student-detail' payment.student_id %}">{{ payment.student }}</a></dd>
       <dt>Группа</dt><dd><a href="{% url 'education:group-detail' payment.group_id %}">{{ payment.group }}</a></dd>
-      <dt>Дата оплаты</dt><dd class="mono">{{ payment.paid_at }}</dd>
-      <dt>Период</dt><dd class="mono">{{ payment.period|date:"F Y" }}</dd>
+      <dt>Получено</dt><dd class="mono">{{ payment.paid_at }} <span class="detail-hint">дата фактического получения денег</span></dd>
+      <dt>За период</dt><dd class="mono">{{ payment.period|date:"F Y" }} <span class="detail-hint">месяц обучения</span></dd>
       <dt>Сумма</dt><dd class="amount">{{ payment.amount }} TJS</dd>
       <dt>Статус</dt><dd><span class="badge badge--{{ payment.status|lower }}">{{ payment.get_status_display }}</span></dd>
       {% if payment.note %}<dt>Заметка</dt><dd>{{ payment.note }}</dd>{% endif %}

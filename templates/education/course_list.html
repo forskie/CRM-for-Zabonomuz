@@ -4,7 +4,7 @@
 <div class="page-head">
   <div class="page-head__main">
     <h1 class="page-title">Курсы</h1>
-    <p class="page-sub">Каталог учебных программ центра</p>
+    <p class="page-sub">{{ page_obj.paginator.count }} учебных программ</p>
   </div>
   {% if user.role != "TEACHER" %}
     <div class="page-actions">
@@ -58,7 +58,7 @@
                     {% if course.status == 'ACTIVE' %}
                       <form class="inline-form" method="post" action="{% url 'education:course-status' course.pk 'ARCHIVED' %}">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn--sm btn--ghost">Архивировать</button>
+                        <button type="submit" class="btn btn--sm btn--ghost" data-confirm="Архивировать курс?">Архивировать</button>
                       </form>
                     {% else %}
                       <form class="inline-form" method="post" action="{% url 'education:course-status' course.pk 'ACTIVE' %}">
@@ -78,7 +78,7 @@
                   {% if has_filters %}
                     <div class="empty-state__title">По заданным фильтрам ничего не найдено.</div>
                   {% else %}
-                    <div class="empty-state__title">Ничего не найдено.</div>
+                    <div class="empty-state__title">Курсов пока нет.</div>
                     {% if user.role != "TEACHER" %}<div class="empty-state__text">Добавьте первый курс кнопкой выше.</div>{% endif %}
                   {% endif %}
                 </div>

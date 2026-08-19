@@ -1,0 +1,708 @@
+{% extends "base.html" %}
+{% block title %}Аналитика — CRM центра{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1 class="page-title">Аналитика</h1>
+  <p class="page-sub">{{ period_label }}</p>
+</div>
+
+{% if period_error %}
+<div class="form-error" role="alert">{{ period_error }}</div>
+{% endif %}
+
+{# ── PERIOD FILTER ─────────────────────────────────────────────── #}
+<div class="toolbar analytics-period">
+  <form method="get" class="toolbar__row">
+    {% for value, label in period_options.items %}
+      <a href="?period={{ value }}" class="btn btn--sm {% if period == value %}btn--primary{% else %}btn--ghost{% endif %}">{{ label }}</a>
+    {% endfor %}
+    {% if period == "custom" %}
+      <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}" class="input input--sm">
+      <span class="text-muted">—</span>
+      <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}" class="input input--sm">
+      <button type="submit" class="btn btn--sm btn--primary">Применить</button>
+    {% endif %}
+  </form>
+</div>
+
+{% if not has_data %}
+<div class="dash-empty-state">
+  <div class="dash-empty-state__icon">
+    {% include "partials/icon.html" with icon="bar-chart" %}
+  </div>
+  <p class="dash-empty-state__title">В системе пока нет данных.</p>
+  <p class="dash-empty-state__text">Добавьте учеников, группы или занятия.</p>
+</div>
+{% else %}
+
+{# ═══════════════════════════════════════════════════════════════ #}
+{# KPI ROW 1 — BUSINESS                                         #}
+{# ═══════════════════════════════════════════════════════════════ #}
+<div class="grid-4 analytics-row">
+  <a href="{% url 'education:student-list' %}" class="stat-card stat-card--clickable">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="users" %}</div>
+    <span class="stat-card__label">Активных учеников</span>
+    <span class="stat-card__value">{{ active_students }}</span>
+    <span class="stat-card__sub">всего; новых {{ new_students }}, завершили {{ ended_students }} за период</span>
+  </a>
+
+  <a href="{% url 'education:group-list' %}" class="stat-card stat-card--clickable">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="graduation" %}</div>
+    <span class="stat-card__label">Активных групп</span>
+    <span class="stat-card__value">{{ active_groups }}</span>
+    <span class="stat-card__sub">всего в системе</span>
+  </a>
+
+  {% if not is_teacher %}
+  <a href="{% url 'education:teacher-list' %}" class="stat-card stat-card--clickable">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="user" %}</div>
+    <span class="stat-card__label">Преподавателей</span>
+    <span class="stat-card__value">{{ active_teachers }}</span>
+    <span class="stat-card__sub">активных</span>
+  </a>
+
+  <div class="stat-card">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="credit-card" %}</div>
+    <span class="stat-card__label">Получено за период</span>
+    <span class="stat-card__value">{{ payments_sum }} TJS</span>
+    {% if payments_delta %}
+      <span class="stat-card__sub trend {% if payments_delta.value > 0 %}trend--up{% elif payments_delta.value < 0 %}trend--down{% endif %}">
+        {% if payments_delta.value > 0 %}+{% endif %}{{ payments_delta.pct }}% к пред. периоду
+      </span>
+    {% elif payments_sum == 0 %}
+      <span class="stat-card__sub">нет платежей за период</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# ═══════════════════════════════════════════════════════════════ #}
+{# KPI ROW 2 — OPERATIONS                                       #}
+{# ═══════════════════════════════════════════════════════════════ #}
+<div class="grid-4 analytics-row">
+  <div class="stat-card">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="calendar" %}</div>
+    <span class="stat-card__label">Занятия за период</span>
+    <span class="stat-card__value">{{ lessons_count }}</span>
+    {% if lessons_delta %}
+      <span class="stat-card__sub trend {% if lessons_delta.value > 0 %}trend--up{% elif lessons_delta.value < 0 %}trend--down{% endif %}">
+        {% if lessons_delta.value > 0 %}+{% endif %}{{ lessons_delta.pct }}% к пред. периоду
+      </span>
+    {% endif %}
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="check-circle" %}</div>
+    <span class="stat-card__label">Завершено</span>
+    <span class="stat-card__value stat-card__value--success">{{ lessons_completed }}</span>
+    <span class="stat-card__sub">из {{ lessons_count }} занятий</span>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="x-circle" %}</div>
+    <span class="stat-card__label">Отменено</span>
+    <span class="stat-card__value {% if lessons_cancelled > 0 %}stat-card__value--danger{% endif %}">{{ lessons_cancelled }}</span>
+    <span class="stat-card__sub">из {{ lessons_count }} занятий</span>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-card__icon">{% include "partials/icon.html" with icon="clock" %}</div>
+    <span class="stat-card__label">Требуют посещаемости</span>
+    <span class="stat-card__value {% if pending_attendance > 0 %}stat-card__value--warning{% endif %}">{{ pending_attendance }}</span>
+    <span class="stat-card__sub">незавершённых уроков</span>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════ #}
+{# CHARTS ROW 1 — PAYMENT TREND + ATTENDANCE                    #}
+{# ═══════════════════════════════════════════════════════════════ #}
+<div class="grid-2 analytics-row">
+  {% if not is_teacher %}
+  <div class="card">
+    <div class="card__head">
+      <h2 class="card__title">Оплаты за период</h2>
+      <span class="card__meta">{{ payments_count }} операций</span>
+    </div>
+    <div class="card__body">
+      <canvas id="chart-payment-trend" height="260"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card__head">
+      <h2 class="card__title">Посещаемость за период</h2>
+      {% if att_rate is not None %}
+        <span class="card__meta">{{ att_rate }}% посещаемости</span>
+      {% endif %}
+    </div>
+    <div class="card__body chart-center">
+      <canvas id="chart-attendance" height="260" class="chart-donut"></canvas>
+    </div>
+  </div>
+
+</div>
+
+{# ═══════════════════════════════════════════════════════════════ #}
+{# CHARTS ROW 2 — LESSON STATUS + TEACHER WORKLOAD              #}
+{# ═══════════════════════════════════════════════════════════════ #}
+<div class="grid-2 analytics-row">
+  <div class="card">
+    <div class="card__head">
+      <h2 class="card__title">Статус занятий</h2>
+    </div>
+    <div class="card__body chart-center">
+      <canvas id="chart-lesson-status" height="260" class="chart-donut"></canvas>
+    </div>
+  </div>
+
+  {% if not is_teacher %}
+  <div class="card">
+    <div class="card__head">
+      <h2 class="card__title">Загруженность преподавателей</h2>
+    </div>
+    <div class="card__body">
+      <canvas id="chart-teacher-workload" height="260"></canvas>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ═══════════════════════════════════════════════════════════════ #}
+{# CHARTS ROW 3 — GROUP ATTENDANCE + REVENUE BY GROUP           #}
+{# ═══════════════════════════════════════════════════════════════ #}
+<div class="grid-2 analytics-row">
+  <div class="card">
+    <div class="card__head">
+      <h2 class="card__title">Посещаемость по группам</h2>
+    </div>
+    <div class="card__body">
+      <canvas id="chart-group-attendance" height="320"></canvas>
+    </div>
+  </div>
+
+  {% if not is_teacher %}
+  <div class="card">
+    <div class="card__head">
+      <h2 class="card__title">Оплаты по группам</h2>
+    </div>
+    <div class="card__body">
+      <canvas id="chart-revenue-group" height="320"></canvas>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ═══════════════════════════════════════════════════════════════ #}
+{# CHARTS ROW 4 — STUDENT GROWTH + REVENUE MONTHLY + FILL RATE  #}
+{# ═══════════════════════════════════════════════════════════════ #}
+<div class="grid-3 analytics-row">
+  <div class="card">
+    <div class="card__head">
+      <h2 class="card__title">Новые ученики</h2>
+      <span class="card__meta">за выбранный период</span>
+    </div>
+    <div class="card__body">
+      <canvas id="chart-students" height="260"></canvas>
+    </div>
+  </div>
+
+  {% if not is_teacher %}
+  <div class="card">
+    <div class="card__head">
+      <h2 class="card__title">Выручка по месяцам</h2>
+      <span class="card__meta">за выбранный период</span>
+    </div>
+    <div class="card__body">
+      <canvas id="chart-revenue" height="260"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head">
+      <h2 class="card__title">Загруженность групп</h2>
+      <span class="card__meta">активных учеников сейчас</span>
+    </div>
+    <div class="card__body">
+      <canvas id="chart-groups" height="320"></canvas>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ═══════════════════════════════════════════════════════════════ #}
+{# TABLES                                                        #}
+{# ═══════════════════════════════════════════════════════════════ #}
+
+{# ── TOP GROUPS ──────────────────────────────────────────────── #}
+<div class="card analytics-row">
+  <div class="card__head">
+    <h2 class="card__title">Группы</h2>
+    <span class="card__meta">занятия, посещаемость и платежи — за период; ученики — активные сейчас</span>
+  </div>
+  <div class="card__body table-wrap">
+    <table class="table table--compact">
+      <thead>
+        <tr>
+          <th>Группа</th>
+          <th>Ученики</th>
+          <th>Занятия</th>
+          <th>Посещаемость</th>
+          {% if not is_teacher %}<th>Оплаты</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in top_groups %}
+        <tr>
+          <td><a href="{% url 'education:group-detail' g.pk %}">{{ g.name }}</a></td>
+          <td>{{ g.students }}</td>
+          <td>{{ g.lessons }}</td>
+          <td>{% if g.attendance_rate is not None %}{{ g.attendance_rate }}%{% else %}&mdash;{% endif %}</td>
+          {% if not is_teacher %}<td>{{ g.payments }} TJS</td>{% endif %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="{% if is_teacher %}4{% else %}5{% endif %}" class="table-empty">За выбранный период нет данных по группам.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── TEACHER PERFORMANCE ─────────────────────────────────────── #}
+<div class="card analytics-row">
+  <div class="card__head">
+    <h2 class="card__title">Преподаватели</h2>
+    <span class="card__meta">занятия, часы и посещаемость — за период; группы и ученики — активные сейчас</span>
+  </div>
+  <div class="card__body table-wrap">
+    <table class="table table--compact">
+      <thead>
+        <tr>
+          <th>Преподаватель</th>
+          <th>Группы</th>
+          <th>Занятия</th>
+          <th>Часы</th>
+          <th>Ученики</th>
+          <th>Посещаемость</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in teacher_perf %}
+        <tr>
+          <td><a href="{% url 'education:teacher-detail' t.pk %}">{{ t.name }}</a></td>
+          <td>{{ t.groups }}</td>
+          <td>{{ t.lessons }}</td>
+          <td>{{ t.workload_hours }}</td>
+          <td>{{ t.students }}</td>
+          <td>{% if t.attendance_rate is not None %}{{ t.attendance_rate }}%{% else %}&mdash;{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="table-empty">За выбранный период нет данных по преподавателям.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── RECENT PAYMENTS ─────────────────────────────────────────── #}
+{% if not is_teacher %}
+<div class="card analytics-row">
+  <div class="card__head">
+    <h2 class="card__title">Последние платежи</h2>
+    <a href="{% url 'education:payment-list' %}" class="btn btn--ghost btn--sm">Все</a>
+  </div>
+  <div class="card__body table-wrap">
+    <table class="table table--compact">
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>Ученик</th>
+          <th>Группа</th>
+          <th>Сумма</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in recent_payments %}
+        <tr>
+          <td>{{ p.paid_at|date:"j E Y" }}</td>
+          <td><a href="{% url 'education:student-detail' p.pk %}">{{ p.student }}</a></td>
+          <td>{{ p.group }}</td>
+          <td>{{ p.amount }} TJS</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="table-empty">Нет платежей за период.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ═══════════════════════════════════════════════════════════════ #}
+{# CHART.JS SCRIPTS                                             #}
+{# ═══════════════════════════════════════════════════════════════ #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.7/chart.umd.min.js"></script>
+<script>
+(function () {
+  var root = document.documentElement;
+
+  function cv(name) {
+    return getComputedStyle(root).getPropertyValue(name).trim();
+  }
+
+  function palette() {
+    return {
+      primary:    cv('--primary'),
+      primarySoft:cv('--primary') + '33',
+      success:    cv('--success'),
+      successSoft:cv('--success') + '33',
+      warning:    cv('--warning'),
+      warningSoft:cv('--warning') + '33',
+      danger:     cv('--danger'),
+      dangerSoft: cv('--danger') + '33',
+      info:       cv('--info') || cv('--primary'),
+      infoSoft:   (cv('--info') || cv('--primary')) + '33',
+      text:       cv('--text'),
+      textSec:    cv('--text-secondary'),
+      border:     cv('--border'),
+    };
+  }
+
+  Chart.defaults.font.family = cv('--font-body') || 'IBM Plex Sans, sans-serif';
+  Chart.defaults.color = cv('--text-secondary');
+
+  var p = palette();
+  var charts = {};
+
+  {% if not is_teacher %}
+  /* ── Payment trend (line) ─────────────────────────────────── */
+  var ptLabels = {{ payment_trend_labels_json|safe }};
+  var ptAmounts = {{ payment_trend_amounts_json|safe }};
+  if (ptLabels.length > 0) {
+    charts.paymentTrend = new Chart(document.getElementById('chart-payment-trend'), {
+      type: 'line',
+      data: {
+        labels: ptLabels,
+        datasets: [{
+          label: 'Сумма (TJS)',
+          data: ptAmounts,
+          borderColor: p.primary,
+          backgroundColor: p.primarySoft,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointBackgroundColor: p.primary,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c) { return c.parsed.y.toLocaleString('ru-RU') + ' TJS'; } } }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: p.border }, ticks: { callback: function(v) { return v.toLocaleString('ru-RU'); } } },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  } else {
+    document.getElementById('chart-payment-trend').parentElement.parentElement.style.display = 'none';
+  }
+  {% endif %}
+
+  /* ── Attendance doughnut ────────────────────────────────────── */
+  var attPresent = {{ att_present }};
+  var attAbsent = {{ att_absent }};
+  var attLate = {{ att_late }};
+  var attUnmarked = {{ att_unmarked }};
+  if (attPresent + attAbsent + attLate + attUnmarked > 0) {
+    charts.attendance = new Chart(document.getElementById('chart-attendance'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Присутствовал', 'Отсутствовал', 'Опоздал', 'Не отмечено'],
+        datasets: [{
+          data: [attPresent, attAbsent, attLate, attUnmarked],
+          backgroundColor: [p.success, p.danger, p.warning, p.textSec],
+          borderWidth: 0,
+          cutout: '65%',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 16 } },
+          tooltip: { callbacks: { label: function(c) { return c.label + ': ' + c.raw; } } }
+        }
+      }
+    });
+  } else {
+    document.getElementById('chart-attendance').parentElement.parentElement.querySelector('.card__body').innerHTML =
+      '<p class="chart-empty">Нет данных о посещаемости за выбранный период.</p>';
+  }
+
+  /* ── Lesson status donut ────────────────────────────────────── */
+  var lsData = {{ lesson_status_data_json|safe }};
+  if (lsData[0] + lsData[1] + lsData[2] > 0) {
+    charts.lessonStatus = new Chart(document.getElementById('chart-lesson-status'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Завершено', 'Запланировано', 'Отменено'],
+        datasets: [{
+          data: lsData,
+          backgroundColor: [p.success, p.primary, p.danger],
+          borderWidth: 0,
+          cutout: '65%',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 16 } },
+          tooltip: { callbacks: { label: function(c) { return c.label + ': ' + c.raw; } } }
+        }
+      }
+    });
+  } else {
+    document.getElementById('chart-lesson-status').parentElement.parentElement.querySelector('.card__body').innerHTML =
+      '<p class="chart-empty">Нет занятий за выбранный период.</p>';
+  }
+
+  {% if not is_teacher %}
+  /* ── Teacher workload (horizontal bar) ──────────────────────── */
+  var twLabels = {{ teacher_workload_labels_json|safe }};
+  var twData = {{ teacher_workload_data_json|safe }};
+  if (twLabels.length > 0) {
+    charts.teacherWorkload = new Chart(document.getElementById('chart-teacher-workload'), {
+      type: 'bar',
+      data: {
+        labels: twLabels,
+        datasets: [{
+          label: 'Часы',
+          data: twData,
+          backgroundColor: p.primary,
+          borderRadius: 4,
+          maxBarThickness: 32,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c) { return c.raw + ' занятий'; } } }
+        },
+        scales: {
+          x: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: p.border } },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  } else {
+    document.getElementById('chart-teacher-workload').parentElement.parentElement.style.display = 'none';
+  }
+  {% endif %}
+
+  /* ── Group attendance (horizontal bar) ──────────────────────── */
+  var gaLabels = {{ group_att_labels_json|safe }};
+  var gaData = {{ group_att_data_json|safe }};
+  if (gaLabels.length > 0) {
+    charts.groupAtt = new Chart(document.getElementById('chart-group-attendance'), {
+      type: 'bar',
+      data: {
+        labels: gaLabels,
+        datasets: [{
+          label: 'Посещаемость %',
+          data: gaData,
+          backgroundColor: gaData.map(function(v) { return v >= 80 ? p.success : v >= 60 ? p.warning : p.danger; }),
+          borderRadius: 4,
+          maxBarThickness: 32,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c) { return c.raw + '%'; } } }
+        },
+        scales: {
+          x: { beginAtZero: true, max: 100, ticks: { callback: function(v) { return v + '%'; } }, grid: { color: p.border } },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  } else {
+    document.getElementById('chart-group-attendance').parentElement.parentElement.querySelector('.card__body').innerHTML =
+      '<p class="chart-empty">Нет данных о посещаемости по группам.</p>';
+  }
+
+  {% if not is_teacher %}
+  /* ── Revenue by group (bar) ─────────────────────────────────── */
+  var rbgLabels = {{ revenue_by_group_labels_json|safe }};
+  var rbgData = {{ revenue_by_group_data_json|safe }};
+  if (rbgLabels.length > 0) {
+    charts.revenueGroup = new Chart(document.getElementById('chart-revenue-group'), {
+      type: 'bar',
+      data: {
+        labels: rbgLabels,
+        datasets: [{
+          label: 'TJS',
+          data: rbgData,
+          backgroundColor: p.primary,
+          borderRadius: 4,
+          maxBarThickness: 48,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c) { return c.raw.toLocaleString('ru-RU') + ' TJS'; } } }
+        },
+        scales: {
+          x: { beginAtZero: true, grid: { color: p.border }, ticks: { callback: function(v) { return v.toLocaleString('ru-RU'); } } },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  } else {
+    document.getElementById('chart-revenue-group').parentElement.parentElement.style.display = 'none';
+  }
+  {% endif %}
+
+  /* ── Student growth (bar, lifetime) ─────────────────────────── */
+  charts.students = new Chart(document.getElementById('chart-students'), {
+    type: 'bar',
+    data: {
+      labels: {{ students_labels_json|safe }},
+      datasets: [{
+        label: 'Новых учеников',
+        data: {{ students_data_json|safe }},
+        backgroundColor: p.primary,
+        borderRadius: 4,
+        maxBarThickness: 48,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { title: function(c) { return c[0].label; } } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: p.border } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  {% if not is_teacher %}
+  /* ── Revenue per month (line, lifetime) ─────────────────────── */
+  charts.revenue = new Chart(document.getElementById('chart-revenue'), {
+    type: 'line',
+    data: {
+      labels: {{ revenue_labels_json|safe }},
+      datasets: [{
+        label: 'Выручка',
+        data: {{ revenue_data_json|safe }},
+        borderColor: p.primary,
+        backgroundColor: p.primarySoft,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: p.primary,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(c) { return c.parsed.y.toLocaleString('ru-RU') + ' TJS'; }
+          }
+        }
+      },
+      scales: {
+        y: { beginAtZero: true, grid: { color: p.border }, ticks: { callback: function(v) { return v.toLocaleString('ru-RU'); } } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  /* ── Group fill rate (bar, lifetime) ────────────────────────── */
+  charts.groups = new Chart(document.getElementById('chart-groups'), {
+    type: 'bar',
+    data: {
+      labels: {{ groups_labels_json|safe }},
+      datasets: [{
+        label: 'Учеников',
+        data: {{ groups_data_json|safe }},
+        backgroundColor: p.primary,
+        borderRadius: 4,
+        maxBarThickness: 48,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: function(c) { return c.raw + ' учеников'; } } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: p.border } },
+        x: { grid: { display: false }, ticks: { maxRotation: 45 } }
+      }
+    }
+  });
+  {% endif %}
+
+  /* ── Theme switcher ─────────────────────────────────────────── */
+  var toggle = document.getElementById('theme-toggle');
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      setTimeout(function () {
+        var np = palette();
+        Chart.defaults.color = np.textSec;
+        Object.keys(charts).forEach(function (key) {
+          var chart = charts[key];
+          var cfg = chart.config;
+          if (cfg.type === 'doughnut') {
+            chart.data.datasets[0].backgroundColor =
+              key === 'attendance' ? [np.success, np.danger, np.warning]
+              : key === 'lessonStatus' ? [np.success, np.primary, np.danger]
+              : [np.success, np.danger];
+          } else if (cfg.type === 'line') {
+            chart.data.datasets[0].borderColor = np.primary;
+            chart.data.datasets[0].backgroundColor = np.primarySoft;
+            chart.data.datasets[0].pointBackgroundColor = np.primary;
+          } else if (cfg.type === 'bar' && key === 'groupAtt') {
+            chart.data.datasets[0].backgroundColor = chart.data.datasets[0].backgroundColor;
+          } else {
+            chart.data.datasets[0].backgroundColor = np.primary;
+          }
+          if (cfg.options && cfg.options.scales) {
+            if (cfg.options.scales.x && cfg.options.scales.x.grid) cfg.options.scales.x.grid.color = np.border;
+            if (cfg.options.scales.y && cfg.options.scales.y.grid) cfg.options.scales.y.grid.color = np.border;
+          }
+          chart.update('none');
+        });
+      }, 50);
+    });
+  }
+})();
+</script>
+{% endif %}{# /has_data #}
+{% endblock %}

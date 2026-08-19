@@ -68,8 +68,8 @@
           {% for lesson in lessons_by_day|get_item:anchor %}
             <tr>
               <td class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</td>
-              <td><a href="{% url 'education:lesson-detail' lesson.pk %}" class="mono"><strong>{{ lesson.group }}</strong>{% if lesson.source == 'OVERRIDE' %} <span class="badge badge--substitute" style="font-size:0.7em;">*</span>{% endif %}</a></td>
-              <td>{{ lesson.group.teacher }}</td>
+              <td><a href="{% url 'education:lesson-detail' lesson.pk %}" class="mono"><strong>{{ lesson.group }}</strong>{% if lesson.source == 'OVERRIDE' %} <span class="badge badge--substitute badge--compact" title="Занятие изменено">Изменено</span>{% endif %}</a></td>
+              <td>{{ lesson.effective_teacher }}</td>
               <td><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></td>
               <td class="mono">{{ lesson.active_count }}</td>
             </tr>
@@ -100,7 +100,8 @@
           {% for lesson in lessons_by_day|get_item:day %}
             <a href="{% url 'education:lesson-detail' lesson.pk %}" class="cal-lesson cal-lesson--{{ lesson.status|lower }}">
               <span class="cal-lesson__time">{{ lesson.start_time|time:"H:i" }}</span>
-              <span class="cal-lesson__name">{{ lesson.group }}{% if lesson.source == 'OVERRIDE' %} <span class="badge badge--substitute" style="font-size:0.7em;"> *</span>{% endif %}</span>
+              <span class="cal-lesson__name">{{ lesson.group }}{% if lesson.source == 'OVERRIDE' %}<span class="cal-lesson__marker" title="Занятие изменено">•</span>{% endif %}</span>
+              {% if not is_teacher %}<span class="cal-lesson__teacher">{{ lesson.effective_teacher }}</span>{% endif %}
             </a>
           {% empty %}
             <span class="calendar-day__empty">Нет занятий</span>

@@ -4,190 +4,77 @@
 <div class="page-head">
   <div class="page-head__main">
     <h1 class="page-title">Занятие</h1>
-    <p class="page-sub">
-      <span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span>
-      <span class="text-faint">{{ lesson.date }} {{ lesson.start_time }}–{{ lesson.end_time }}</span>
-    </p>
+    <p class="page-sub"><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span> <span class="text-faint">{{ lesson.date }} {{ lesson.start_time }}–{{ lesson.end_time }}</span></p>
   </div>
-  {% if user.role != 'TEACHER' %}
-    <div class="page-actions">
-      {% if lesson.status != 'CANCELLED' %}
-        <a href="{% url 'education:lesson-reschedule' lesson.pk %}" class="btn">Перенести</a>
-        {% if lesson.status == 'SCHEDULED' %}
-          <form class="inline-form" method="post" action="{% url 'education:lesson-complete' lesson.pk %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn--primary">Завершить занятие</button>
-          </form>
-        {% endif %}
-      {% endif %}
-      <a href="{% url 'education:lesson-edit' lesson.pk %}" class="btn">Изменить</a>
-    </div>
-  {% elif lesson.group.teacher.user == user %}
-    <div class="page-actions">
-      {% if lesson.status == 'SCHEDULED' %}
-        <form class="inline-form" method="post" action="{% url 'education:lesson-complete' lesson.pk %}">
-          {% csrf_token %}
-          <button type="submit" class="btn btn--primary">Завершить занятие</button>
-        </form>
-      {% endif %}
-    </div>
-  {% endif %}
-</div>
-
-{% if lesson.topic or lesson.teacher_note or lesson.homework %}
-<section class="panel">
-  <div class="panel__head">
-    <h2 class="panel__title">Отчёт о занятии</h2>
-    {% if user.role != 'TEACHER' or lesson.group.teacher.user == user %}
-      <a href="{% url 'education:lesson-report' lesson.pk %}" class="btn btn--sm">Редактировать</a>
-    {% endif %}
-  </div>
-  <div class="panel__body">
-    <dl class="dl">
-      <dt>Тема</dt><dd>{{ lesson.topic|default:"—" }}</dd>
-      <dt>Заметка преподавателя</dt><dd>{{ lesson.teacher_note|default:"—"|linebreaksbr }}</dd>
-      <dt>Домашнее задание</dt><dd>{{ lesson.homework|default:"—"|linebreaksbr }}</dd>
-    </dl>
-  </div>
-</section>
-{% elif user.role != 'TEACHER' or lesson.group.teacher.user == user %}
-<section class="panel">
-  <div class="panel__head">
-    <h2 class="panel__title">Отчёт о занятии</h2>
-    <a href="{% url 'education:lesson-report' lesson.pk %}" class="btn btn--sm">Заполнить</a>
-  </div>
-  <div class="panel__body">
-    <div class="empty-state">
-      <div class="empty-state__icon">{% include "partials/icon.html" with icon="book" %}</div>
-      <div class="empty-state__title">Отчёт ещё не заполнен. Тема, заметка и домашнее задание появятся здесь.</div>
-    </div>
-  </div>
-</section>
-{% endif %}
-
-<div class="panel">
-  <div class="panel__body">
-    <dl class="dl">
-      <dt>Группа</dt><dd>{{ lesson.group }}</dd>
-      <dt>Курс</dt><dd>{{ lesson.group.course }}</dd>
-      <dt>Преподаватель</dt><dd>{{ lesson.group.teacher }}</dd>
-      <dt>Дата</dt><dd class="mono">{{ lesson.date }}</dd>
-      <dt>Время</dt><dd class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</dd>
-      <dt>Статус</dt><dd><span class="badge badge--{{ lesson.status|lower }}">{{ lesson.get_status_display }}</span></dd>
-      {% if lesson.source == 'OVERRIDE' %}<dt>Источник</dt><dd><span class="badge badge--substitute">Исключение расписания</span></dd>{% endif %}
-    </dl>
+  <div class="page-actions">
+    {% if user.role != 'TEACHER' and lesson.status != 'CANCELLED' %}<a href="{% url 'education:lesson-reschedule' lesson.pk %}" class="btn">Перенести</a><a href="{% url 'education:lesson-edit' lesson.pk %}" class="btn">Изменить</a>{% endif %}
+    {% if next_lesson %}<a href="{% url 'education:lesson-detail' next_lesson.pk %}" class="btn">Следующее занятие</a>{% endif %}
   </div>
 </div>
 
-<section class="panel">
-  <div class="panel__head">
-    <h2 class="panel__title">Attendance</h2>
-  </div>
-  <div class="panel__body">
-    {% if can_edit %}
+<div class="panel"><div class="panel__body"><dl class="dl">
+  <dt>Группа</dt><dd>{{ lesson.group }}</dd><dt>Курс</dt><dd>{{ lesson.group.course }}</dd>
+  <dt>Преподаватель</dt><dd>{{ lesson.effective_teacher }}</dd><dt>Дата</dt><dd class="mono">{{ lesson.date }}</dd>
+  <dt>Время</dt><dd class="mono">{{ lesson.start_time }}–{{ lesson.end_time }}</dd>
+  {% if lesson.source == 'OVERRIDE' %}<dt>Источник</dt><dd><span class="badge badge--substitute">Исключение расписания</span></dd>{% endif %}
+</dl></div></div>
+
+{% if can_edit %}
+<form method="post" class="form form--wide lesson-workspace" id="lesson-workspace">
+  {% csrf_token %}
+  <section class="panel">
+    <div class="panel__head"><h2 class="panel__title">Отчёт о занятии</h2></div>
+    <div class="panel__body form-grid">
+      {{ report_form.non_field_errors }}
+      {% for field in report_form %}<div class="field{% if field.errors %} field--error{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+    </div>
+  </section>
+  <section class="panel">
+    <div class="panel__head lesson-workspace__head">
+      <h2 class="panel__title">Посещаемость</h2>
+      {% if attendance_form.students and lesson.status != 'CANCELLED' %}<button type="button" class="btn btn--sm" id="mark-all-present">Отметить пустые как присутствующие</button>{% endif %}
+    </div>
+    <div class="panel__body">
+      {% if attendance_form.non_field_errors %}<ul class="errorlist">{% for error in attendance_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
       {% if attendance_form.students %}
-        <form method="post" class="form form--wide">
-          {% csrf_token %}
-          {% if attendance_form.non_field_errors %}
-            <ul class="errorlist">
-              {% for error in attendance_form.non_field_errors %}
-                <li>{{ error }}</li>
-              {% endfor %}
-            </ul>
-          {% endif %}
-          <div class="table-wrap attendance-table">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Ученик</th>
-                  <th>Статус</th>
-                  <th>Заметка</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for student, status_field, note_field in attendance_form.rows %}
-                  <tr>
-                    <td>{{ student.full_name }}</td>
-                    <td>
-                      {{ status_field }}
-                      {% if status_field.errors %}
-                        <ul class="errorlist">
-                          {% for error in status_field.errors %}
-                            <li>{{ error }}</li>
-                          {% endfor %}
-                        </ul>
-                      {% endif %}
-                    </td>
-                    <td>{{ note_field }}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% if lesson.status != 'CANCELLED' %}
-            <div class="form-actions">
-              <button type="submit" class="btn btn--primary">Сохранить посещаемость</button>
-            </div>
-          {% endif %}
-        </form>
-      {% else %}
-        <div class="empty-state">
-          <div class="empty-state__icon">{% include "partials/icon.html" with icon="users" %}</div>
-          <div class="empty-state__title">Нет активных учеников для отметки.</div>
-        </div>
-      {% endif %}
-    {% else %}
-      {% if attendance_records %}
-        <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Ученик</th>
-                <th>Статус</th>
-                <th>Заметка</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for record in attendance_records %}
-                <tr>
-                  <td>{{ record.student }}</td>
-                  <td><span class="badge badge--{{ record.status|lower }}">{{ record.get_status_display }}</span></td>
-                  <td>{{ record.note|default:"—" }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <div class="empty-state">
-          <div class="empty-state__icon">{% include "partials/icon.html" with icon="clock" %}</div>
-          <div class="empty-state__title">Отметки посещаемости ещё не заполнены.</div>
-        </div>
-      {% endif %}
-    {% endif %}
-
-    <div class="stat-grid attendance-summary">
-      <div class="stat-card">
-        <div class="stat-card__label">Students</div>
-        <div class="stat-card__value">{{ summary.total }}</div>
+        <div class="table-wrap attendance-table"><table class="table">
+          <thead><tr><th>Ученик</th><th>Статус</th><th>Заметка</th></tr></thead><tbody>
+          {% for student, status_field, note_field in attendance_form.rows %}<tr>
+            <td data-label="Ученик">{{ student.full_name }}</td><td data-label="Статус">{{ status_field }}{{ status_field.errors }}</td><td data-label="Заметка">{{ note_field }}{{ note_field.errors }}</td>
+          </tr>{% endfor %}
+          </tbody>
+        </table></div>
+      {% else %}<div class="empty-state"><div class="empty-state__title">Нет активных учеников для отметки.</div></div>{% endif %}
+      <div class="stat-grid attendance-summary">
+        <div class="stat-card"><div class="stat-card__label">Ученики</div><div class="stat-card__value">{{ summary.total }}</div></div>
+        <div class="stat-card stat-card--success"><div class="stat-card__label">Присутствуют</div><div class="stat-card__value">{{ summary.present }}</div></div>
+        <div class="stat-card stat-card--danger"><div class="stat-card__label">Отсутствуют</div><div class="stat-card__value">{{ summary.absent }}</div></div>
+        <div class="stat-card stat-card--warning"><div class="stat-card__label">Опоздали</div><div class="stat-card__value">{{ summary.late }}</div></div>
+        <div class="stat-card stat-card--warning"><div class="stat-card__label">Не отмечены</div><div class="stat-card__value">{{ summary.not_marked }}</div></div>
       </div>
-      <div class="stat-card stat-card--success">
-        <div class="stat-card__label">Present</div>
-        <div class="stat-card__value">{{ summary.present }}</div>
-      </div>
-      <div class="stat-card stat-card--danger">
-        <div class="stat-card__label">Absent</div>
-        <div class="stat-card__value">{{ summary.absent }}</div>
-      </div>
-      <div class="stat-card stat-card--warning">
-        <div class="stat-card__label">Late</div>
-        <div class="stat-card__value">{{ summary.late }}</div>
-      </div>
-      <div class="stat-card stat-card--warning">
-        <div class="stat-card__label">Not marked</div>
-        <div class="stat-card__value">{{ summary.not_marked }}</div>
-      </div>
+      {% if lesson.status != 'CANCELLED' %}<div class="form-actions lesson-workspace__actions">
+        <button type="submit" name="action" value="save" class="btn">Сохранить</button>
+        {% if lesson.status == 'SCHEDULED' %}<button type="submit" name="action" value="save_complete" class="btn btn--primary" data-confirm="Сохранить данные и завершить занятие?">Сохранить и завершить</button>{% endif %}
+      </div>{% endif %}
     </div>
-  </div>
-</section>
+  </section>
+</form>
+{% else %}
+<section class="panel"><div class="panel__head"><h2 class="panel__title">Отчёт и посещаемость</h2></div><div class="panel__body">
+  <dl class="dl"><dt>Тема</dt><dd>{{ lesson.topic|default:"—" }}</dd><dt>Заметка преподавателя</dt><dd>{{ lesson.teacher_note|default:"—"|linebreaksbr }}</dd><dt>Домашнее задание</dt><dd>{{ lesson.homework|default:"—"|linebreaksbr }}</dd></dl>
+  {% if attendance_records %}<div class="table-wrap"><table class="table"><thead><tr><th>Ученик</th><th>Статус</th><th>Заметка</th></tr></thead><tbody>{% for record in attendance_records %}<tr><td>{{ record.student }}</td><td><span class="badge badge--{{ record.status|lower }}">{{ record.get_status_display }}</span></td><td>{{ record.note|default:"—" }}</td></tr>{% endfor %}</tbody></table></div>
+  {% else %}<div class="empty-state"><div class="empty-state__title">Отметки посещаемости ещё не заполнены.</div></div>{% endif %}
+</div></section>
+{% endif %}
 {% endblock %}
+
+{% block extra_js %}<script>
+(function () {
+  var markAll = document.getElementById("mark-all-present");
+  if (markAll) markAll.addEventListener("click", function () {
+    document.querySelectorAll("#lesson-workspace select.attendance-status").forEach(function (select) {
+      if (!select.value) { select.value = "PRESENT"; select.dispatchEvent(new Event("change", { bubbles: true })); }
+    });
+  });
+})();
+</script>{% endblock %}

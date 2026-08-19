@@ -280,11 +280,11 @@ class E2ETeacherWorkflow(E2EBase):
     def test_teacher_has_no_financial_data_anywhere(self):
         self.login(self.teacher_a_user)
         response = self.client.get(reverse("education:group-detail", args=[self.group_a.pk]))
-        self.assertEqual(response.context["payments_total"], Decimal("0"))
-        self.assertEqual(list(response.context["payments"]), [])
+        self.assertNotIn("payments_total", response.context)
+        self.assertNotIn("payments", response.context)
         self.assertNotContains(response, "350,00 TJS")
         response = self.client.get(reverse("education:student-detail", args=[self.student_a.pk]))
-        self.assertEqual(list(response.context["payments"]), [])
+        self.assertNotIn("payments", response.context)
         self.assertNotContains(response, "350,00 TJS")
         response = self.client.get(reverse("education:course-list"))
         self.assertNotContains(response, "300,00 TJS")
@@ -351,7 +351,7 @@ class E2EPaymentLifecycle(E2EBase):
         self.login(self.owner)
         response = self.client.get(reverse("dashboard"))
         self.assertEqual(response.context["payments_total"], Decimal("450.00"))
-        self.assertEqual(response.context["payments_count"], 3)
+        self.assertEqual(response.context["payments_count"], 2)
         recent_ids = {p.pk for p in response.context["recent_payments"]}
         self.assertTrue({self.payment_a.pk, second.pk}.issubset(recent_ids))
 
@@ -664,8 +664,8 @@ class E2EDashboardConsistency(E2EBase):
         self.assertEqual(response.context["attendance_late"], Attendance.objects.filter(status=AttendanceStatus.LATE).count())
         expected_total = Payment.objects.filter(period=period, status=PaymentStatus.PAID).aggregate(total=Sum("amount"))["total"]
         self.assertEqual(response.context["payments_total"], expected_total)
-        self.assertEqual(response.context["payments_count"], Payment.objects.filter(period=period).count())
-        self.assertEqual(list(response.context["recent_payments"]), list(Payment.objects.select_related("student", "group__course").order_by("-paid_at", "-pk")[:10]))
+        self.assertEqual(response.context["payments_count"], Payment.objects.filter(paid_at__year=period.year, paid_at__month=period.month, status=PaymentStatus.PAID).count())
+        self.assertEqual(list(response.context["recent_payments"]), list(Payment.objects.filter(status=PaymentStatus.PAID).select_related("student", "group__course").order_by("-paid_at", "-pk")[:5]))
         self.assertEqual(list(response.context["recent_attendance"]), list(Attendance.objects.select_related("student", "lesson__group").order_by("-lesson__date", "-pk")[:10]))
         expected_groups = list(Group.objects.filter(status=RecordStatus.ACTIVE).annotate(student_count=Count("enrollments", filter=Q(enrollments__status=EnrollmentStatus.ACTIVE), distinct=True)).order_by("name"))
         self.assertEqual(list(response.context["active_groups"]), expected_groups)
