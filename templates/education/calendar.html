@@ -54,6 +54,7 @@
 {% if view_mode == 'day' %}
   <div class="panel">
     <div class="panel__body panel__body--tight">
+      <div class="table-wrap">
       <table class="table">
         <thead>
           <tr>
@@ -85,6 +86,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 {% elif view_mode == 'week' %}

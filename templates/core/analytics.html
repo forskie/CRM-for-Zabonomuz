@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Аналитика — CRM центра{% endblock %}
 {% block content %}
 
@@ -342,9 +343,19 @@
 {# ═══════════════════════════════════════════════════════════════ #}
 {# CHART.JS SCRIPTS                                             #}
 {# ═══════════════════════════════════════════════════════════════ #}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.7/chart.umd.min.js"></script>
+<script src="{% static 'vendor/chart.js/chart.umd.min.js' %}"></script>
 <script>
 (function () {
+  if (typeof window.Chart === 'undefined') {
+    document.querySelectorAll('canvas').forEach(function (canvas) {
+      var fallback = document.createElement('p');
+      fallback.className = 'chart-empty';
+      fallback.textContent = 'График временно недоступен.';
+      canvas.replaceWith(fallback);
+    });
+    return;
+  }
+
   var root = document.documentElement;
 
   function cv(name) {

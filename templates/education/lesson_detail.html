@@ -24,9 +24,15 @@
   {% csrf_token %}
   <section class="panel">
     <div class="panel__head"><h2 class="panel__title">Отчёт о занятии</h2></div>
-    <div class="panel__body form-grid">
+    <div class="panel__body lesson-report-grid">
       {{ report_form.non_field_errors }}
-      {% for field in report_form %}<div class="field{% if field.errors %} field--error{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+      {% for field in report_form %}
+        <div class="form-group lesson-report-field lesson-report-field--{{ field.name }}{% if field.errors %} has-error{% endif %}">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}<ul class="errorlist">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      {% endfor %}
     </div>
   </section>
   <section class="panel">

@@ -3504,7 +3504,7 @@ a.dash-kpi-card:hover {
     min-height: 40px;
   }
 
-  .crp-dp__day {
+  .crm-dp__day {
     min-width: 36px;
     min-height: 36px;
   }
@@ -3520,6 +3520,15 @@ a.dash-kpi-card:hover {
 /* Stage 19: compact lesson workspace and phone-friendly attendance cards. */
 .lesson-workspace__head, .lesson-workspace__actions { gap: 10px; flex-wrap: wrap; }
 .attendance-status, .attendance-note { width: 100%; }
+.lesson-report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.lesson-report-field { min-width: 0; margin: 0; }
+.lesson-report-field--topic { grid-column: 1 / -1; }
+.lesson-report-field textarea { min-height: 132px; line-height: 1.5; }
+.attendance-table input[type="text"] {
+  min-width: 180px;
+  padding-right: .65rem;
+  background-image: none;
+}
 @media (max-width: 600px) {
   .lesson-workspace .panel__body { padding: 14px; }
   .lesson-workspace__head { align-items: flex-start; }
@@ -3527,9 +3536,16 @@ a.dash-kpi-card:hover {
   .attendance-table { overflow: visible; }
   .attendance-table table, .attendance-table tbody, .attendance-table tr, .attendance-table td { display: block; width: 100%; }
   .attendance-table thead { display: none; }
-  .attendance-table tr { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; padding: 10px; }
-  .attendance-table td { border: 0; padding: 5px 0; }
-  .attendance-table td::before { content: attr(data-label); display: block; color: var(--text-faint); font-size: 12px; margin-bottom: 4px; }
+  .lesson-report-grid { grid-template-columns: 1fr; gap: 14px; }
+  .lesson-report-field--topic { grid-column: auto; }
+  .lesson-report-field textarea { min-height: 112px; }
+  .attendance-table tr { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; padding: 12px; background: var(--surface); }
+  .attendance-table td { border: 0; padding: 6px 0; }
+  .attendance-table td:first-child { padding-top: 0; font-size: .95rem; font-weight: 600; }
+  .attendance-table td:first-child::before { display: none; }
+  .attendance-table td::before { content: attr(data-label); display: block; color: var(--text-faint); font-size: 11px; font-weight: 600; margin-bottom: 5px; text-transform: uppercase; }
+  .attendance-table select,
+  .attendance-table input[type="text"] { min-width: 0; min-height: 44px; font-size: 16px; }
   .lesson-workspace__actions .btn { flex: 1 1 100%; }
 }
 
@@ -3651,8 +3667,8 @@ body { line-height: 1.5; letter-spacing: -.005em; }
 @media (max-width: 768px) {
   .brand__text small { display: none; }
   .page-head { align-items: flex-start; }
-  .page-actions { width: 100%; overflow-x: auto; padding-bottom: 2px; }
-  .page-actions .btn, .page-actions .inline-form { flex: 0 0 auto; }
+  .page-actions { width: 100%; overflow: visible; }
+  .page-actions .btn, .page-actions .inline-form { flex: 0 1 auto; }
   .panel__head { align-items: flex-start; gap: 12px; }
   .period-picker { width: 100%; flex-wrap: wrap; }
   .period-picker label, .period-picker input { flex: 1 1 150px; }
@@ -3681,4 +3697,283 @@ body { line-height: 1.5; letter-spacing: -.005em; }
   .brand__text { font-size: 14px; }
   .user-chip { display: none; }
   .toolbar--filters, .dash-kpi-grid { grid-template-columns: 1fr; }
+}
+
+/* Final responsive safeguards. Keep page overflow impossible while allowing
+   dense data tables to scroll inside their own wrapper. */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.app-body,
+.content,
+.page-head__main,
+.page-actions,
+.panel,
+.card,
+.toolbar,
+.list__item,
+.list__main,
+.form-group,
+.dash-grid,
+.dash-primary,
+.dash-secondary {
+  min-width: 0;
+}
+
+.page-title,
+.page-sub,
+.panel__title,
+.panel__subtitle,
+.alert,
+.list__item,
+.dl dd,
+.table td {
+  overflow-wrap: anywhere;
+}
+
+.table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overscroll-behavior-inline: contain;
+}
+
+.table-wrap > .table {
+  min-width: max-content;
+}
+
+.table-wrap > .table:has(.empty-state),
+.table-wrap > .table:has(.table-empty) {
+  min-width: 100%;
+}
+
+.crm-dropdown,
+.crm-datetime-picker {
+  max-width: min(360px, calc(100vw - 24px));
+}
+
+.crm-datetime-picker {
+  max-height: min(420px, calc(100vh - 100px));
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  html.sidebar-open,
+  body.sidebar-open {
+    overflow: hidden;
+  }
+
+  body.sidebar-open {
+    position: fixed;
+    inset-inline: 0;
+    width: 100%;
+  }
+
+  html.sidebar-open .topbar {
+    position: fixed;
+    inset: 0 0 auto;
+    width: 100%;
+  }
+
+  .sidebar {
+    width: min(290px, calc(100vw - 42px));
+    max-width: 100%;
+    padding-bottom: max(1.4rem, env(safe-area-inset-bottom));
+  }
+
+  .sidebar-backdrop {
+    touch-action: none;
+  }
+
+  .nav-link,
+  .icon-btn,
+  .page-link,
+  .segmented__item {
+    min-height: 44px;
+  }
+
+  .page-actions,
+  .form-actions,
+  .list__actions,
+  .row-actions {
+    align-items: stretch;
+  }
+
+  .page-actions > .btn,
+  .page-actions > .inline-form,
+  .page-actions > .inline-form > .btn {
+    min-width: 0;
+  }
+
+  .toolbar--filters {
+    align-items: end;
+  }
+
+  .table th,
+  .table td {
+    padding-left: .75rem;
+    padding-right: .75rem;
+  }
+
+  .crm-dropdown {
+    max-height: min(300px, calc(100vh - 120px));
+  }
+
+  .calendar-grid--month {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  :root {
+    --topbar-h: 56px;
+  }
+
+  .topbar {
+    padding-inline: 8px;
+  }
+
+  .topbar__left {
+    gap: 4px;
+  }
+
+  .brand__text {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .topbar .btn {
+    min-height: 36px;
+  }
+
+  .page-head {
+    gap: .75rem;
+    margin-bottom: 1rem;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .page-actions,
+  .form-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .page-actions > .btn,
+  .page-actions > .inline-form,
+  .page-actions > .inline-form > .btn,
+  .form-actions > .btn,
+  .form-actions > .inline-form,
+  .form-actions > .inline-form > .btn {
+    width: 100%;
+    white-space: normal;
+    height: auto;
+    min-height: 44px;
+    line-height: 1.25;
+    padding-block: .55rem;
+  }
+
+  .page-actions > :only-child,
+  .form-actions > :only-child {
+    grid-column: 1 / -1;
+  }
+
+  .toolbar--filters {
+    grid-template-columns: 1fr;
+    padding: .75rem;
+  }
+
+  .toolbar--filters .toolbar__search {
+    grid-column: auto;
+  }
+
+  .panel__head,
+  .card__head {
+    min-height: 0;
+    padding: .8rem .875rem;
+  }
+
+  .panel__body,
+  .card__body {
+    padding: .875rem;
+  }
+
+  .panel__body--tight,
+  .card__body--tight {
+    padding: 0;
+  }
+
+  .segmented {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .segmented__item {
+    justify-content: center;
+    padding-inline: 6px;
+  }
+
+  .calendar-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calendar-nav__title {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .calendar-nav .btn {
+    width: 100%;
+    white-space: normal;
+  }
+
+  .calendar-day {
+    min-width: 0;
+  }
+
+  .cal-lesson {
+    min-width: 0;
+  }
+
+  .crm-datetime-picker {
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(300px, calc(100vw - 24px));
+    min-width: 0;
+  }
+
+  .crm-dp__day {
+    width: 100%;
+    min-width: 32px;
+  }
+}
+
+@media (max-width: 340px) {
+  .brand__text { display: none; }
+
+  .page-actions,
+  .form-actions,
+  .calendar-grid--month {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-nav {
+    gap: 6px;
+  }
 }

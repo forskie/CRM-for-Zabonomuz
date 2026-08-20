@@ -305,6 +305,7 @@
           var opt = sel.options[i];
           var item = create("div", "crm-dropdown__item", {
             role: "option",
+            tabindex: "-1",
             "data-value": opt.value
           });
           item.textContent = opt.textContent;
@@ -384,6 +385,8 @@
           }
         }
       });
+
+      on(sel, "change", render);
 
       // Sync when form resets
       var form = sel.closest("form");

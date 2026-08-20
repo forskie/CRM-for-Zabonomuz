@@ -247,9 +247,9 @@ class DashboardActionRequiredTests(TestCase):
         course = Course.objects.create(name="English", default_monthly_fee=Decimal("300.00"))
         self.group = Group.objects.create(name="English A1", course=course, teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("350.00"))
         self.student = Student.objects.create(full_name="Ученик Тест", phone="900200001")
-        Enrollment.objects.create(student=self.student, group=self.group, started_at=date(2026, 8, 1))
         self.today = date.today()
-        self.lesson = Lesson.objects.create(group=self.group, date=self.today, start_time=time(18, 0), end_time=time(19, 0))
+        Enrollment.objects.create(student=self.student, group=self.group, started_at=self.today - timedelta(days=1))
+        self.lesson = Lesson.objects.create(group=self.group, date=self.today, start_time=time(0, 0), end_time=time(0, 1))
 
     def _get(self, user):
         self.client.force_login(user)
@@ -284,9 +284,9 @@ class DashboardKPITests(TestCase):
         course = Course.objects.create(name="English", default_monthly_fee=Decimal("300.00"))
         self.group = Group.objects.create(name="English A1", course=course, teacher=self.teacher_user.teacher_profile, monthly_fee=Decimal("350.00"))
         self.student = Student.objects.create(full_name="Тест К", phone="900300001")
-        Enrollment.objects.create(student=self.student, group=self.group, started_at=date(2026, 8, 1))
         today = date.today()
-        self.lesson = Lesson.objects.create(group=self.group, date=today, start_time=time(18, 0), end_time=time(19, 0))
+        Enrollment.objects.create(student=self.student, group=self.group, started_at=today - timedelta(days=1))
+        self.lesson = Lesson.objects.create(group=self.group, date=today, start_time=time(0, 0), end_time=time(0, 1))
         Attendance.objects.create(lesson=self.lesson, student=self.student, status=AttendanceStatus.PRESENT)
 
     def _get(self, user):

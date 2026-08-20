@@ -238,7 +238,7 @@ class SearchFilterTestCase(TestCase):
         Payment.objects.all().delete()
         self.client.force_login(self.admin)
         response = self.client.get(reverse("education:payment-list"))
-        self.assertContains(response, "Ничего не найдено.")
+        self.assertContains(response, "Оплат пока нет.")
         self.assertNotContains(response, "По заданным фильтрам ничего не найдено.")
 
     def test_search_no_results_shows_filters_message(self):

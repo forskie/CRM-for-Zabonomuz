@@ -36,7 +36,7 @@
 <header class="topbar">
   <div class="topbar__left">
     {% if user.is_authenticated %}
-    <button type="button" class="icon-btn sidebar-toggle" id="sidebar-toggle" aria-label="Открыть меню" aria-controls="sidebar">
+    <button type="button" class="icon-btn sidebar-toggle" id="sidebar-toggle" aria-label="Открыть меню" aria-controls="sidebar" aria-expanded="false">
       {% include "partials/icon.html" with icon="menu" %}
     </button>
     {% endif %}
@@ -154,13 +154,39 @@
     var open = document.getElementById('sidebar-toggle');
     var backdrop = document.getElementById('sidebar-backdrop');
     if (open && backdrop) {
-      open.addEventListener('click', function () {
-        document.body.classList.toggle('sidebar-open');
-        backdrop.hidden = !document.body.classList.contains('sidebar-open');
-      });
-      backdrop.addEventListener('click', function () {
+      var lockedScrollY = 0;
+      var lockPage = function () {
+        lockedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        document.documentElement.classList.add('sidebar-open');
+        document.body.classList.add('sidebar-open');
+        document.body.style.top = '-' + lockedScrollY + 'px';
+      };
+      var unlockPage = function () {
+        document.documentElement.classList.remove('sidebar-open');
         document.body.classList.remove('sidebar-open');
+        document.body.style.top = '';
+        window.scrollTo(0, lockedScrollY);
+      };
+      var closeSidebar = function () {
+        unlockPage();
         backdrop.hidden = true;
+        open.setAttribute('aria-expanded', 'false');
+        open.setAttribute('aria-label', 'Открыть меню');
+      };
+
+      open.addEventListener('click', function () {
+        var isOpen = !document.body.classList.contains('sidebar-open');
+        if (isOpen) lockPage(); else unlockPage();
+        backdrop.hidden = !isOpen;
+        open.setAttribute('aria-expanded', String(isOpen));
+        open.setAttribute('aria-label', isOpen ? 'Закрыть меню' : 'Открыть меню');
+      });
+      backdrop.addEventListener('click', closeSidebar);
+      document.getElementById('sidebar').addEventListener('click', function (event) {
+        if (event.target.closest('a') && window.matchMedia('(max-width: 768px)').matches) closeSidebar();
+      });
+      window.addEventListener('resize', function () {
+        if (!window.matchMedia('(max-width: 768px)').matches) closeSidebar();
       });
     }
   })();
