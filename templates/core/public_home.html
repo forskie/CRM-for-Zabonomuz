@@ -1,22 +1,631 @@
 {% extends "base.html" %}
 {% block title %}Zabonomuz — учебный центр{% endblock %}
 {% block content %}
+<style>
+  /* ============================================================
+     Premium Landing (Mobile-First)
+     Uses EXISTING crm.css design tokens only.
+     ============================================================ */
+  
+  .public-page {
+    width: 100%;
+    max-width: 100%;
+    background: var(--bg);
+  }
+
+  /* --- Hero Section --- */
+  .public-hero {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    align-items: center;
+    padding: 2.5rem 0 3rem;
+    border-bottom: 1px solid var(--border);
+    min-height: auto; /* Критично: убираем фиксированную высоту на мобильных */
+  }
+
+  @media (min-width: 1024px) {
+    .public-hero {
+      grid-template-columns: 1.2fr 1fr;
+      gap: 4rem;
+      padding: 4rem 0 5rem;
+      min-height: clamp(500px, 60vh, 700px);
+    }
+  }
+
+  .public-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .public-kicker::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: var(--primary);
+    border-radius: 50%;
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
+
+  .public-hero h1 {
+    font-size: clamp(2rem, 7vw, 4rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin: 0 0 1.25rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word; /* Предотвращает вылезание текста */
+  }
+
+  .public-hero h1 span {
+    color: var(--primary);
+  }
+
+  .public-lead {
+    max-width: 100%;
+    color: var(--text-secondary);
+    font-size: clamp(1rem, 4vw, 1.25rem);
+    line-height: 1.6;
+    margin: 0 0 2rem;
+  }
+
+  /* Кнопки на мобильных: колонка, 100% ширины, удобная высота */
+  .public-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    width: 100%;
+  }
+
+  @media (min-width: 640px) {
+    .public-actions {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+
+  .public-actions .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 48px; /* Удобный touch target */
+    font-size: 1rem;
+  }
+
+  .public-features {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .public-features {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+  }
+
+  .public-feature {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .public-feature .icon {
+    color: var(--primary);
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  /* --- Hero Visual (Скрыт на мобильных для экономии места) --- */
+  .public-hero-visual {
+    position: relative;
+    height: clamp(300px, 40vw, 450px);
+    display: none;
+  }
+
+  @media (min-width: 1024px) {
+    .public-hero-visual {
+      display: block;
+    }
+  }
+
+  .public-card-visual {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: 1.25rem;
+  }
+
+  .public-card-main {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface-secondary) 100%);
+    z-index: 1;
+  }
+
+  .public-card-float {
+    width: 180px;
+    z-index: 2;
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .public-card-float--1 {
+    top: 10%;
+    right: -5%;
+  }
+
+  .public-card-float--2 {
+    bottom: 15%;
+    left: -5%;
+    animation-delay: 2s;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-15px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .public-card-float { animation: none; }
+  }
+
+  .public-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .public-card-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--info-soft);
+    color: var(--info);
+    border: 1px solid var(--info-border);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .public-card-icon .icon { width: 18px; height: 18px; }
+
+  .public-card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .public-card-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 2px 0 0;
+  }
+
+  .public-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem;
+    background: var(--surface-secondary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .public-card-row:last-child { margin-bottom: 0; }
+
+  .public-card-label { color: var(--text-secondary); font-weight: 500; }
+  .public-card-value { color: var(--text); font-weight: 600; }
+
+  .public-badge {
+    display: inline-flex;
+    padding: 2px 8px;
+    background: var(--primary);
+    color: var(--primary-contrast);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  /* --- Sections Base --- */
+  .public-info-section,
+  .public-steps-section,
+  .public-cta-section {
+    padding: 3rem 0;
+  }
+
+  @media (min-width: 768px) {
+    .public-info-section,
+    .public-steps-section,
+    .public-cta-section {
+      padding: 4rem 0;
+    }
+  }
+
+  .public-section-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .public-section-title {
+    font-size: clamp(1.5rem, 6vw, 2.25rem);
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.01em;
+    word-wrap: break-word;
+  }
+
+  .public-section-subtitle {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin: 0;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.5;
+  }
+
+  /* --- Grids: 1 колонка на мобильных, auto-fit на десктопе --- */
+  .public-info-grid,
+  .public-steps-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .public-info-grid,
+    .public-steps-grid {
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+  }
+
+  .public-info-card,
+  .public-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+
+  .public-info-card:hover,
+  .public-step:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .public-info-card-icon,
+  .public-step-number {
+    width: 44px;
+    height: 44px;
+    background: var(--primary);
+    color: var(--primary-contrast);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.25rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .public-info-card-icon {
+    margin: 0 0 1.25rem; /* Для карточек преимуществ иконка слева */
+  }
+
+  .public-info-card-icon .icon,
+  .public-step-number .icon { 
+    width: 22px; 
+    height: 22px; 
+  }
+
+  .public-step-number {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .public-info-card-title,
+  .public-step-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 0.5rem;
+  }
+
+  .public-info-card-text,
+  .public-step-text {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* --- CTA Section --- */
+  .public-cta-box {
+    background: var(--primary);
+    border-radius: var(--radius-lg);
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    color: var(--primary-contrast);
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+
+  @media (min-width: 640px) {
+    .public-cta-box {
+      padding: clamp(2.5rem, 5vw, 4rem) 2rem;
+    }
+  }
+
+  .public-cta-box::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 80%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .public-cta-title {
+    font-size: clamp(1.5rem, 6vw, 2.25rem);
+    font-weight: 700;
+    margin: 0 0 1rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .public-cta-text {
+    font-size: 1rem;
+    line-height: 1.6;
+    margin: 0 0 2rem;
+    opacity: 0.95;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .public-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.5rem;
+    width: 100%; /* На мобильных на всю ширину */
+    max-width: 400px;
+    background: var(--primary-contrast);
+    color: var(--primary);
+    font-size: 1rem;
+    font-weight: 700;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    z-index: 1;
+    min-height: 48px;
+    border: none;
+  }
+
+  @media (min-width: 640px) {
+    .public-cta-btn {
+      width: auto;
+    }
+  }
+
+  .public-cta-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    text-decoration: none;
+    color: var(--primary-strong);
+  }
+
+  .public-cta-btn:focus-visible {
+    outline: 2px solid var(--primary-contrast);
+    outline-offset: 2px;
+  }
+
+  .public-cta-btn .icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* --- Extreme Mobile Safeguards (320px - 480px) --- */
+  @media (max-width: 480px) {
+    .public-hero {
+      padding: 2rem 0 2.5rem;
+      gap: 1.5rem;
+    }
+    
+    .public-info-card,
+    .public-step {
+      padding: 1.25rem;
+    }
+
+    .public-cta-box {
+      padding: 2rem 1.25rem;
+    }
+  }
+</style>
+
 <div class="public-page">
-  <section class="public-hero">
-    <div class="public-hero__inner">
-      <p class="public-kicker">Учебный центр в {{ center_address }}</p>
-      <h1>Zabonomuz</h1>
-      <p class="public-lead">Обучение с понятным расписанием, контролем посещаемости и вниманием к каждому ученику.</p>
+  <!-- Hero Section -->
+  <section class="public-hero" aria-label="Главная информация">
+    <div class="public-hero-content">
+      <p class="public-kicker">Учебный центр • {{ center_address }}</p>
+      <h1>
+        Языки, которые<br>
+        <span>открывают новые возможности</span>
+      </h1>
+      <p class="public-lead">
+        Zabonomuz — это обучение с понятным расписанием, контролем посещаемости и вниманием к каждому ученику.
+      </p>
       <div class="public-actions">
-        <a class="btn btn--primary public-call" href="tel:{{ center_phone_href }}">Позвонить {{ center_phone }}</a>
-        <a class="btn" href="{% url 'accounts:login' %}">Войти в личный кабинет</a>
+        <a class="btn btn--primary public-call" href="tel:{{ center_phone_href }}" aria-label="Позвонить в учебный центр">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          Позвонить {{ center_phone }}
+        </a>
+        <a class="btn btn--secondary" href="{% url 'accounts:login' %}">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+          Личный кабинет
+        </a>
+      </div>
+      <div class="public-features">
+        <div class="public-feature">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>Понятное расписание</span>
+        </div>
+        <div class="public-feature">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Группы по уровню</span>
+        </div>
+        <div class="public-feature">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          <span>Контроль обучения</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero Visual (Abstract Educational UI) -->
+    <div class="public-hero-visual" aria-hidden="true">
+      <div class="public-card-visual public-card-main">
+        <div class="public-card-header">
+          <div class="public-card-icon">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+          </div>
+          <div>
+            <h3 class="public-card-title">Расписание занятий</h3>
+            <p class="public-card-subtitle">Ближайшие группы</p>
+          </div>
+        </div>
+        <div class="public-card-content">
+          <div class="public-card-row">
+            <span class="public-card-label">English</span>
+            <span class="public-badge">Группа A</span>
+          </div>
+          <div class="public-card-row">
+            <span class="public-card-label">Russian</span>
+            <span class="public-badge">Группа B</span>
+          </div>
+          <div class="public-card-row">
+            <span class="public-card-label">Длительность</span>
+            <span class="public-card-value">60 мин</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="public-card-visual public-card-float public-card-float--1">
+        <div class="public-card-icon" style="width: 32px; height: 32px; margin-bottom: 0.75rem; background: var(--success-soft); color: var(--success); border-color: var(--success-border);">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </div>
+        <div class="public-card-title" style="font-size: 0.85rem;">Расписание</div>
+        <div class="public-card-subtitle">Пн, Ср, Пт</div>
+      </div>
+
+      <div class="public-card-visual public-card-float public-card-float--2">
+        <div class="public-card-icon" style="width: 32px; height: 32px; margin-bottom: 0.75rem; background: var(--warning-soft); color: var(--warning); border-color: var(--warning-border);">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        </div>
+        <div class="public-card-title" style="font-size: 0.85rem;">Группа</div>
+        <div class="public-card-subtitle">6-8 человек</div>
       </div>
     </div>
   </section>
-  <section class="public-info" aria-label="Информация для клиентов">
-    <div class="public-info__item"><strong>Расписание</strong><span>Уточните подходящие дни и время занятий по телефону.</span></div>
-    <div class="public-info__item"><strong>Группы</strong><span>Подберём группу с подходящим уровнем подготовки.</span></div>
-    <div class="public-info__item"><strong>Связь с центром</strong><a href="tel:{{ center_phone_href }}">{{ center_phone }}</a></div>
+
+  <!-- Why Zabonomuz Section -->
+  <section class="public-info-section" aria-label="Преимущества учебного центра">
+    <div class="public-section-header">
+      <h2 class="public-section-title">Почему Zabonomuz</h2>
+      <p class="public-section-subtitle">Мы создаём комфортную среду для эффективного обучения</p>
+    </div>
+    <div class="public-info-grid">
+      <div class="public-info-card">
+        <div class="public-info-card-icon">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <h3 class="public-info-card-title">Удобное расписание</h3>
+        <p class="public-info-card-text">Подберём подходящие дни и время занятий, чтобы обучение гармонично вписалось в ваш ритм жизни.</p>
+      </div>
+      <div class="public-info-card">
+        <div class="public-info-card-icon">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        </div>
+        <h3 class="public-info-card-title">Группы по уровню</h3>
+        <p class="public-info-card-text">Подберём группу с подходящим уровнем подготовки, чтобы обучение было комфортным и эффективным.</p>
+      </div>
+      <div class="public-info-card">
+        <div class="public-info-card-icon">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        </div>
+        <h3 class="public-info-card-title">Связь с центром</h3>
+        <p class="public-info-card-text">Всегда на связи. Позвоните нам, чтобы уточнить любые вопросы по обучению и расписанию.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- How to Start Section -->
+  <section class="public-steps-section" aria-label="Как начать обучение">
+    <div class="public-section-header">
+      <h2 class="public-section-title">Как начать обучение</h2>
+      <p class="public-section-subtitle">Три простых шага к началу занятий</p>
+    </div>
+    <div class="public-steps-grid">
+      <div class="public-step">
+        <div class="public-step-number">1</div>
+        <h3 class="public-step-title">Связаться с центром</h3>
+        <p class="public-step-text">Позвоните нам по телефону, чтобы обсудить ваши цели и пожелания по обучению.</p>
+      </div>
+      <div class="public-step">
+        <div class="public-step-number">2</div>
+        <h3 class="public-step-title">Подобрать группу</h3>
+        <p class="public-step-text">Мы подберём подходящую группу с учётом вашего уровня подготовки и удобного расписания.</p>
+      </div>
+      <div class="public-step">
+        <div class="public-step-number">3</div>
+        <h3 class="public-step-title">Начать обучение</h3>
+        <p class="public-step-text">Приходите на первое занятие и начинайте изучать язык в комфортной группе.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="public-cta-section" aria-label="Призыв к действию">
+    <div class="public-cta-box">
+      <h2 class="public-cta-title">Готовы начать обучение?</h2>
+      <p class="public-cta-text">Свяжитесь с Zabonomuz — поможем подобрать подходящую группу и расписание.</p>
+      <a class="public-cta-btn" href="tel:{{ center_phone_href }}" aria-label="Позвонить в учебный центр">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        Позвонить {{ center_phone }}
+      </a>
+    </div>
   </section>
 </div>
 {% endblock %}
