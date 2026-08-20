@@ -10,6 +10,7 @@ urlpatterns = [
     path("students/create/", views.student_create, name="student-create"),
     path("students/<int:pk>/", views.student_detail, name="student-detail"),
     path("students/<int:pk>/edit/", views.student_edit, name="student-edit"),
+    path("students/<int:pk>/transfer/", views.student_transfer, name="student-transfer"),
     path("students/<int:pk>/<str:status>/", views.student_set_status, name="student-status"),
     path("teachers/", views.teacher_list, name="teacher-list"),
     path("teachers/create/", views.teacher_create, name="teacher-create"),
@@ -53,4 +54,7 @@ urlpatterns = [
     path("students/<int:student_pk>/payments/create/", views.student_payment_create, name="student-payment-create"),
     path("groups/<int:group_pk>/payments/create/", views.group_payment_create, name="group-payment-create"),
     path("audit/", views.audit_list, name="audit-list"),
+    path("discounts/", views.discount_list, name="discount-list"),
+    path("discounts/create/", views.discount_create, name="discount-create"),
+    path("discounts/<int:pk>/edit/", views.discount_edit, name="discount-edit"),
 ]

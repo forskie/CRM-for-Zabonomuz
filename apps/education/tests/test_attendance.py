@@ -109,7 +109,10 @@ class AttendanceTestCase(TestCase):
 
     def test_teacher_can_mark_attendance_on_own_lesson(self):
         self.client.force_login(self.teacher_user)
-        response = self.client.post(reverse("education:lesson-detail", args=[self.lesson.pk]), self._mark_fields(self.lesson))
+        response = self.client.post(reverse("education:lesson-detail", args=[self.lesson.pk]), {
+            f"status_{self.student.pk}": AttendanceStatus.PRESENT,
+            f"status_{self.student_2.pk}": AttendanceStatus.ABSENT,
+        })
         self.assertRedirects(response, reverse("education:lesson-detail", args=[self.lesson.pk]))
         self.assertEqual(Attendance.objects.filter(lesson=self.lesson).count(), 2)
         self.assertEqual(Attendance.objects.get(lesson=self.lesson, student=self.student).status, AttendanceStatus.PRESENT)
@@ -127,7 +130,7 @@ class AttendanceTestCase(TestCase):
         Attendance.objects.create(lesson=self.other_lesson, student=self.other_student, status=AttendanceStatus.ABSENT)
         self.client.force_login(self.teacher_user)
         response = self.client.get(reverse("education:lesson-detail", args=[self.lesson.pk]))
-        self.assertContains(response, "Присутствовал")
+        self.assertContains(response, "Был")
         response = self.client.get(reverse("education:student-detail", args=[self.student.pk]))
         self.assertContains(response, "Присутствовал")
 

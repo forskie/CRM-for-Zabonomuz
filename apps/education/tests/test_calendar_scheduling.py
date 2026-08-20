@@ -306,19 +306,14 @@ class LessonReportTests(CalendarSchedulingBase):
         self.client.force_login(user)
         return self.client.post(reverse("education:lesson-report", args=[lesson.pk]), data)
 
-    def test_teacher_writes_report_for_own_lesson(self):
+    def test_teacher_cannot_write_report_for_own_lesson(self):
         response = self._post(self.teacher_a_user, self.lesson, topic="Present Perfect", teacher_note="Хорошо", homework="Упражнения 4–6")
-        self.assertRedirects(response, reverse("education:lesson-detail", args=[self.lesson.pk]))
+        self.assertEqual(response.status_code, 403)
         self.lesson.refresh_from_db()
-        self.assertEqual(self.lesson.topic, "Present Perfect")
-        self.assertEqual(self.lesson.teacher_note, "Хорошо")
-        self.assertEqual(self.lesson.homework, "Упражнения 4–6")
-        log = AuditLog.objects.latest("pk")
-        self.assertEqual(log.action, AuditAction.LESSON_REPORT)
-        self.assertEqual(log.target_id, self.lesson.pk)
+        self.assertEqual(self.lesson.topic, "")
 
     def test_teacher_cannot_report_foreign_lesson(self):
-        self.assertEqual(self._post(self.teacher_a_user, self.foreign_lesson, topic="X").status_code, 404)
+        self.assertEqual(self._post(self.teacher_a_user, self.foreign_lesson, topic="X").status_code, 403)
 
     def test_admin_reports_any_lesson(self):
         response = self._post(self.admin, self.foreign_lesson, topic="Тема")
@@ -335,14 +330,14 @@ class LessonReportTests(CalendarSchedulingBase):
         self.lesson.refresh_from_db()
         self.assertEqual(self.lesson.topic, "")
 
-    def test_report_page_shows_report_fields(self):
+    def test_teacher_lesson_page_hides_report_fields(self):
         self.lesson.topic = "Present Perfect"
         self.lesson.homework = "Упражнения"
         self.lesson.save()
         self.client.force_login(self.teacher_a_user)
         response = self.client.get(reverse("education:lesson-detail", args=[self.lesson.pk]))
-        self.assertContains(response, "Present Perfect")
-        self.assertContains(response, "Отчёт о занятии")
+        self.assertNotContains(response, "Present Perfect")
+        self.assertNotContains(response, "Отчёт о занятии")
 
 
 class LessonCompleteTests(CalendarSchedulingBase):
@@ -359,17 +354,14 @@ class LessonCompleteTests(CalendarSchedulingBase):
         self.client.force_login(user)
         return self.client.post(reverse("education:lesson-complete", args=[lesson.pk]))
 
-    def test_teacher_completes_own_lesson(self):
+    def test_teacher_cannot_complete_own_lesson(self):
         response = self._post(self.teacher_a_user, self.lesson)
-        self.assertRedirects(response, reverse("education:lesson-detail", args=[self.lesson.pk]))
+        self.assertEqual(response.status_code, 403)
         self.lesson.refresh_from_db()
-        self.assertEqual(self.lesson.status, LessonStatus.COMPLETED)
-        log = AuditLog.objects.latest("pk")
-        self.assertEqual(log.action, AuditAction.LESSON_COMPLETE)
-        self.assertEqual(log.target_id, self.lesson.pk)
+        self.assertEqual(self.lesson.status, LessonStatus.SCHEDULED)
 
     def test_teacher_cannot_complete_foreign_lesson(self):
-        self.assertEqual(self._post(self.teacher_a_user, self.foreign_lesson).status_code, 404)
+        self.assertEqual(self._post(self.teacher_a_user, self.foreign_lesson).status_code, 403)
         self.foreign_lesson.refresh_from_db()
         self.assertEqual(self.foreign_lesson.status, LessonStatus.SCHEDULED)
 

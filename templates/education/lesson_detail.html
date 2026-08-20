@@ -22,7 +22,7 @@
 {% if can_edit %}
 <form method="post" class="form form--wide lesson-workspace" id="lesson-workspace">
   {% csrf_token %}
-  <section class="panel">
+  {% if not teacher_mode %}<section class="panel">
     <div class="panel__head"><h2 class="panel__title">Отчёт о занятии</h2></div>
     <div class="panel__body lesson-report-grid">
       {{ report_form.non_field_errors }}
@@ -34,7 +34,7 @@
         </div>
       {% endfor %}
     </div>
-  </section>
+  </section>{% endif %}
   <section class="panel">
     <div class="panel__head lesson-workspace__head">
       <h2 class="panel__title">Посещаемость</h2>
@@ -44,9 +44,9 @@
       {% if attendance_form.non_field_errors %}<ul class="errorlist">{% for error in attendance_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
       {% if attendance_form.students %}
         <div class="table-wrap attendance-table"><table class="table">
-          <thead><tr><th>Ученик</th><th>Статус</th><th>Заметка</th></tr></thead><tbody>
+          <thead><tr><th>Ученик</th><th>Статус</th>{% if not teacher_mode %}<th>Заметка</th>{% endif %}</tr></thead><tbody>
           {% for student, status_field, note_field in attendance_form.rows %}<tr>
-            <td data-label="Ученик">{{ student.full_name }}</td><td data-label="Статус">{{ status_field }}{{ status_field.errors }}</td><td data-label="Заметка">{{ note_field }}{{ note_field.errors }}</td>
+            <td data-label="Ученик">{{ student.full_name }}</td><td data-label="Статус">{{ status_field }}{{ status_field.errors }}</td>{% if not teacher_mode %}<td data-label="Заметка">{{ note_field }}{{ note_field.errors }}</td>{% endif %}
           </tr>{% endfor %}
           </tbody>
         </table></div>
@@ -60,7 +60,7 @@
       </div>
       {% if lesson.status != 'CANCELLED' %}<div class="form-actions lesson-workspace__actions">
         <button type="submit" name="action" value="save" class="btn">Сохранить</button>
-        {% if lesson.status == 'SCHEDULED' %}<button type="submit" name="action" value="save_complete" class="btn btn--primary" data-confirm="Сохранить данные и завершить занятие?">Сохранить и завершить</button>{% endif %}
+        {% if not teacher_mode and lesson.status == 'SCHEDULED' %}<button type="submit" name="action" value="save_complete" class="btn btn--primary" data-confirm="Сохранить данные и завершить занятие?">Сохранить и завершить</button>{% endif %}
       </div>{% endif %}
     </div>
   </section>

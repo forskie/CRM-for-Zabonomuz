@@ -255,19 +255,17 @@ class AnalyticsEmptyStateTests(TestCase):
 class AnalyticsTeacherAccessTests(TestCase):
     password = "Secure-test-password-2026"
 
-    def test_teacher_gets_scoped_analytics(self):
+    def test_teacher_cannot_access_analytics(self):
         teacher = User.objects.create_user("teacher", password=self.password, role=UserRole.TEACHER)
         self.client.force_login(teacher)
         response = self.client.get(reverse("core:analytics"))
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["is_teacher"])
-        self.assertEqual(response.context["payments_sum"], Decimal("0.00"))
+        self.assertEqual(response.status_code, 403)
 
-    def test_admin_can_access(self):
+    def test_admin_cannot_access(self):
         admin = User.objects.create_user("admin", password=self.password, role=UserRole.ADMIN)
         self.client.force_login(admin)
         response = self.client.get(reverse("core:analytics"))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
 
     def test_owner_can_access(self):
         owner = User.objects.create_user("owner", password=self.password, role=UserRole.OWNER)

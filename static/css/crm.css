@@ -3977,3 +3977,12 @@ canvas {
     gap: 6px;
   }
 }
+.teacher-photo {
+  display: block;
+  width: 112px;
+  height: 112px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  object-fit: cover;
+}

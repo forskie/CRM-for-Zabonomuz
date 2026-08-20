@@ -29,6 +29,7 @@
 {% url 'education:lesson-list' as lessons_url %}
 {% url 'education:payment-list' as payments_url %}
 {% url 'education:audit-list' as audit_url %}
+{% url 'education:discount-list' as discounts_url %}
 {% url 'accounts:user-list' as users_url %}
 {% url 'core:analytics' as analytics_url %}
 {% url 'accounts:logout' as logout_url %}
@@ -77,7 +78,7 @@
         <a class="nav-link {% if students_url in request.path %}active{% endif %}" href="{{ students_url }}">
           {% include "partials/icon.html" with icon="user" %}Ученики
         </a>
-        <a class="nav-link {% if teachers_url in request.path %}active{% endif %}" href="{{ teachers_url }}">
+        {% if user.role != 'TEACHER' %}<a class="nav-link {% if teachers_url in request.path %}active{% endif %}" href="{{ teachers_url }}">
           {% include "partials/icon.html" with icon="users" %}Преподаватели
         </a>
         <a class="nav-link {% if courses_url in request.path %}active{% endif %}" href="{{ courses_url }}">
@@ -85,16 +86,16 @@
         </a>
         <a class="nav-link {% if groups_url in request.path %}active{% endif %}" href="{{ groups_url }}">
           {% include "partials/icon.html" with icon="graduation" %}Группы
-        </a>
+        </a>{% endif %}
         <a class="nav-link {% if calendar_url in request.path %}active{% endif %}" href="{{ calendar_url }}">
           {% include "partials/icon.html" with icon="calendar" %}Календарь
         </a>
         <a class="nav-link {% if lessons_url in request.path %}active{% endif %}" href="{{ lessons_url }}">
           {% include "partials/icon.html" with icon="hash" %}Занятия
         </a>
-        <a class="nav-link {% if request.path == analytics_url %}active{% endif %}" href="{{ analytics_url }}">
+        {% if user.is_owner %}<a class="nav-link {% if request.path == analytics_url %}active{% endif %}" href="{{ analytics_url }}">
           {% include "partials/icon.html" with icon="bar-chart" %}Аналитика
-        </a>
+        </a>{% endif %}
       </div>
 
       {% if user.role != 'TEACHER' %}
@@ -105,6 +106,9 @@
         </a>
         <a class="nav-link {% if audit_url in request.path %}active{% endif %}" href="{{ audit_url }}">
           {% include "partials/icon.html" with icon="shield" %}Аудит
+        </a>
+        <a class="nav-link {% if discounts_url in request.path %}active{% endif %}" href="{{ discounts_url }}">
+          {% include "partials/icon.html" with icon="tag" %}Скидки и акции
         </a>
       </div>
       {% endif %}

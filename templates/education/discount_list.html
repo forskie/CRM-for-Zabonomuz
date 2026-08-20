@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Скидки и акции — CRM центра{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head__main"><h1 class="page-title">Скидки и акции</h1><p class="page-sub">Персональные и групповые условия оплаты</p></div>
+  <div class="page-actions"><a class="btn btn--primary" href="{% url 'education:discount-create' %}">Добавить скидку</a></div>
+</div>
+<section class="panel"><div class="panel__body panel__body--tight"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Название</th><th>Для кого</th><th>Размер</th><th>Период</th><th>Статус</th><th></th></tr></thead>
+  <tbody>{% for discount in page_obj %}<tr>
+    <td><strong>{{ discount.name }}</strong></td><td>{{ discount.student|default:discount.group }}</td><td class="mono">{{ discount.percentage }}%</td>
+    <td class="mono">{{ discount.starts_at }} — {{ discount.ends_at|default:"без срока" }}</td>
+    <td><span class="badge badge--{% if discount.is_active %}active{% else %}archived{% endif %}">{% if discount.is_active %}Активна{% else %}Отключена{% endif %}</span></td>
+    <td class="table-actions"><a class="btn btn--sm" href="{% url 'education:discount-edit' discount.pk %}">Изменить</a></td>
+  </tr>{% empty %}<tr><td colspan="6" class="table-empty">Скидок и акций пока нет.</td></tr>{% endfor %}</tbody>
+</table></div></div></section>
+{% include "partials/pagination.html" %}
+{% endblock %}

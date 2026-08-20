@@ -109,7 +109,7 @@ class AnalyticsCorrectnessTests(Stage18Base):
         self.assertFalse(context["period_has_data"])
         self.assertTrue(context["has_data"])
 
-    def test_teacher_scope_excludes_foreign_and_financial_data(self):
+    def test_teacher_cannot_access_analytics(self):
         foreign_user = User.objects.create_user("foreign18", password=self.password, role=UserRole.TEACHER)
         foreign_group = Group.objects.create(
             name="Foreign", course=self.course, teacher=foreign_user.teacher_profile, monthly_fee=Decimal("100")
@@ -121,13 +121,8 @@ class AnalyticsCorrectnessTests(Stage18Base):
             student=foreign_student, group=foreign_group, amount=Decimal("500"),
             paid_at=timezone.localdate(), period=timezone.localdate().replace(day=1),
         )
-        context = self.get_analytics(self.teacher_user).context
-        self.assertEqual(context["active_students"], 1)
-        self.assertEqual(context["active_groups"], 1)
-        self.assertEqual(context["active_teachers"], 1)
-        self.assertEqual(context["payments_sum"], Decimal("0.00"))
-        self.assertEqual(json.loads(context["revenue_data_json"]), [])
-        self.assertNotIn("Foreign", json.loads(context["groups_labels_json"]))
+        response = self.get_analytics(self.teacher_user)
+        self.assertEqual(response.status_code, 403)
 
     def test_selected_period_controls_metrics_and_chart_lengths(self):
         Lesson.objects.create(group=self.group, date=date(2025, 1, 10), start_time=time(8), end_time=time(9))

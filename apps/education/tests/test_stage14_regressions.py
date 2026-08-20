@@ -205,7 +205,7 @@ class LessonCompletionRequiresAttendanceTests(Stage14RegressionBase):
     def test_teacher_complete_rejected_without_attendance(self):
         self.login(self.teacher_user)
         response = self.client.post(reverse("education:lesson-complete", args=[self.lesson.pk]))
-        self.assertRedirects(response, reverse("education:lesson-detail", args=[self.lesson.pk]))
+        self.assertEqual(response.status_code, 403)
         self.lesson.refresh_from_db()
         self.assertEqual(self.lesson.status, LessonStatus.SCHEDULED)
 

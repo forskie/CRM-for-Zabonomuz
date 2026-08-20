@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from apps.accounts.models import UserRole
 
-from .models import Attendance, AttendanceStatus, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, OverrideType, Payment, PaymentStatus, Schedule, ScheduleOverride, Student, Teacher
+from .models import Attendance, AttendanceStatus, Course, Discount, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, OverrideType, Payment, PaymentStatus, Schedule, ScheduleOverride, Student, Teacher
 
 
 PHONE_PATTERN = re.compile(r"^[0-9+()\-\s]{5,32}$")
@@ -34,8 +34,9 @@ class StudentForm(PhoneValidationMixin, forms.ModelForm):
 class TeacherForm(PhoneValidationMixin, forms.ModelForm):
     class Meta:
         model = Teacher
-        fields = ("full_name", "phone")
-        labels = {"full_name": "ФИО", "phone": "Телефон"}
+        fields = ("full_name", "phone", "photo")
+        labels = {"full_name": "ФИО", "phone": "Телефон", "photo": "Фото лица"}
+        widgets = {"photo": forms.ClearableFileInput(attrs={"accept": "image/*"})}
 
     def clean_full_name(self):
         full_name = self.cleaned_data["full_name"].strip()
@@ -47,6 +48,7 @@ class TeacherForm(PhoneValidationMixin, forms.ModelForm):
 class TeacherCreateForm(PhoneValidationMixin, UserCreationForm):
     full_name = forms.CharField(max_length=255, label="ФИО")
     phone = forms.CharField(max_length=32, required=False, label="Телефон")
+    photo = forms.ImageField(required=False, label="Фото лица", widget=forms.ClearableFileInput(attrs={"accept": "image/*"}))
 
     class Meta(UserCreationForm.Meta):
         model = get_user_model()
@@ -61,6 +63,7 @@ class TeacherCreateForm(PhoneValidationMixin, UserCreationForm):
             teacher = user.teacher_profile
             teacher.full_name = self.cleaned_data["full_name"]
             teacher.phone = self.cleaned_data["phone"]
+            teacher.photo = self.cleaned_data.get("photo")
             teacher.save()
         return user.teacher_profile
 
@@ -319,9 +322,10 @@ class LessonFromScheduleForm(forms.Form):
 class AttendanceBulkForm(forms.Form):
     """One server-defined field pair per eligible student; client ids are never trusted."""
 
-    def __init__(self, *args, lesson: Lesson, **kwargs):
+    def __init__(self, *args, lesson: Lesson, teacher_mode=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.lesson = lesson
+        self.teacher_mode = teacher_mode
         active_students = lesson.active_students()
         existing = Attendance.objects.filter(lesson=lesson).select_related("student")
         students = {student.pk: student for student in active_students}
@@ -331,23 +335,24 @@ class AttendanceBulkForm(forms.Form):
         for student_id, student in sorted(students.items(), key=lambda item: item[1].full_name):
             record = records.get(student_id)
             self.fields[f"status_{student_id}"] = forms.ChoiceField(
-                choices=[("", "Не отмечено")] + list(AttendanceStatus.choices),
+                choices=[("", "Не отмечено")] + ([(AttendanceStatus.PRESENT, "Был"), (AttendanceStatus.ABSENT, "Не был")] if teacher_mode else list(AttendanceStatus.choices)),
                 required=False,
                 initial=record.status if record else "",
                 label=student.full_name,
                 widget=forms.Select(attrs={"class": "attendance-status"}),
             )
-            self.fields[f"note_{student_id}"] = forms.CharField(
+            if not teacher_mode:
+                self.fields[f"note_{student_id}"] = forms.CharField(
                 required=False,
                 initial=record.note if record else "",
-                label="Примечание",
-                widget=forms.TextInput(attrs={"class": "attendance-note"}),
-            )
+                    label="Примечание",
+                    widget=forms.TextInput(attrs={"class": "attendance-note"}),
+                )
 
     def rows(self):
         """Yield (student, status_field, note_field) triplets for a table layout."""
         for student_id, student in sorted(self.students.items(), key=lambda item: item[1].full_name):
-            yield (student, self[f"status_{student_id}"], self[f"note_{student_id}"])
+            yield (student, self[f"status_{student_id}"], None if self.teacher_mode else self[f"note_{student_id}"])
 
     def save(self):
         if self.lesson.status == LessonStatus.CANCELLED:
@@ -356,12 +361,47 @@ class AttendanceBulkForm(forms.Form):
             status = self.cleaned_data[f"status_{student_id}"]
             if not status:
                 continue
-            record, created = Attendance.objects.get_or_create(lesson=self.lesson, student=student, defaults={"status": status, "note": self.cleaned_data[f"note_{student_id}"]})
+            note = "" if self.teacher_mode else self.cleaned_data[f"note_{student_id}"]
+            record, created = Attendance.objects.get_or_create(lesson=self.lesson, student=student, defaults={"status": status, "note": note})
             if not created:
                 record.status = status
-                record.note = self.cleaned_data[f"note_{student_id}"]
+                if not self.teacher_mode:
+                    record.note = note
                 record.full_clean()
                 record.save(update_fields=("status", "note", "updated_at"))
+
+
+class StudentTransferForm(forms.Form):
+    enrollment = forms.ModelChoiceField(queryset=Enrollment.objects.none(), label="Текущая группа")
+    target_group = forms.ModelChoiceField(queryset=Group.objects.none(), label="Новая группа")
+    transfer_date = forms.DateField(label="Дата перевода", widget=forms.DateInput(attrs={"type": "date"}), initial=timezone.localdate)
+
+    def __init__(self, *args, student: Student, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.student = student
+        self.fields["enrollment"].queryset = student.enrollments.filter(status=EnrollmentStatus.ACTIVE).select_related("group")
+        self.fields["target_group"].queryset = Group.objects.filter(status="ACTIVE")
+
+    def clean(self):
+        cleaned = super().clean()
+        source, target, transfer_date = cleaned.get("enrollment"), cleaned.get("target_group"), cleaned.get("transfer_date")
+        if source and source.student_id != self.student.pk:
+            raise ValidationError("Выбрано чужое зачисление.")
+        if source and target and source.group_id == target.pk:
+            self.add_error("target_group", "Выберите другую группу.")
+        if source and transfer_date and transfer_date <= source.started_at:
+            self.add_error("transfer_date", "Дата перевода должна быть позже даты начала обучения.")
+        if target and Enrollment.objects.filter(student=self.student, group=target, status=EnrollmentStatus.ACTIVE).exists():
+            self.add_error("target_group", "Ученик уже состоит в этой группе.")
+        return cleaned
+
+
+class DiscountForm(forms.ModelForm):
+    class Meta:
+        model = Discount
+        fields = ("name", "student", "group", "percentage", "starts_at", "ends_at", "is_active")
+        labels = {"name": "Название акции", "student": "Ученик", "group": "Группа", "percentage": "Скидка, %", "starts_at": "Начало", "ends_at": "Окончание", "is_active": "Активна"}
+        widgets = {"starts_at": forms.DateInput(attrs={"type": "date"}), "ends_at": forms.DateInput(attrs={"type": "date"})}
 
 
 class PaymentForm(forms.ModelForm):

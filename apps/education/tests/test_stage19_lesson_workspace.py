@@ -55,7 +55,7 @@ class Stage19LessonWorkspaceTests(TestCase):
         self.assertContains(response, "if (!select.value)")
         self.assertContains(response, 'class="attendance-status"')
         self.assertContains(response, 'data-label="Статус"')
-        self.assertContains(response, "Сохранить и завершить")
+        self.assertNotContains(response, "Сохранить и завершить")
 
     def test_mark_all_is_client_only_and_get_does_not_mutate(self):
         Attendance.objects.create(lesson=self.lesson, student=self.student_one, status=AttendanceStatus.ABSENT)
@@ -65,7 +65,7 @@ class Stage19LessonWorkspaceTests(TestCase):
         self.assertEqual(Attendance.objects.count(), 1)
 
     def test_save_updates_attendance_and_report_without_completing(self):
-        self.client.force_login(self.teacher_user)
+        self.client.force_login(self.owner)
         response = self.client.post(self.url(), self.payload())
         self.assertRedirects(response, self.url())
         self.lesson.refresh_from_db()
@@ -74,7 +74,7 @@ class Stage19LessonWorkspaceTests(TestCase):
         self.assertEqual(Attendance.objects.get(lesson=self.lesson, student=self.student_one).status, AttendanceStatus.PRESENT)
 
     def test_save_and_complete_is_atomic_happy_path(self):
-        self.client.force_login(self.teacher_user)
+        self.client.force_login(self.owner)
         response = self.client.post(self.url(), self.payload(action="save_complete"))
         self.assertRedirects(response, self.url())
         self.lesson.refresh_from_db()
@@ -83,7 +83,7 @@ class Stage19LessonWorkspaceTests(TestCase):
         self.assertEqual(Attendance.objects.filter(lesson=self.lesson).count(), 2)
 
     def test_save_and_complete_rejects_incomplete_roster_without_partial_save(self):
-        self.client.force_login(self.teacher_user)
+        self.client.force_login(self.owner)
         response = self.client.post(self.url(), self.payload(action="save_complete", second=""))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "не отмечено учеников — 1")
@@ -93,7 +93,7 @@ class Stage19LessonWorkspaceTests(TestCase):
         self.assertFalse(Attendance.objects.filter(lesson=self.lesson).exists())
 
     def test_unexpected_report_failure_rolls_back_attendance(self):
-        self.client.force_login(self.teacher_user)
+        self.client.force_login(self.owner)
         with patch("apps.education.views.LessonReportForm.save", side_effect=RuntimeError("boom")):
             with self.assertRaises(RuntimeError):
                 self.client.post(self.url(), self.payload(action="save_complete"))

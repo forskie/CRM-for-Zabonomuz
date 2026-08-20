@@ -13,6 +13,7 @@
     <div class="page-actions">
       <a href="{% url 'education:student-payment-create' student.pk %}" class="btn btn--primary">Добавить оплату</a>
       <a href="{% url 'education:student-edit' student.pk %}" class="btn">Редактировать</a>
+      {% if active_enrollments %}<a href="{% url 'education:student-transfer' student.pk %}" class="btn">Перевести в группу</a>{% endif %}
       {% if student.status == 'ACTIVE' %}
         <form class="inline-form" method="post" action="{% url 'education:student-status' student.pk 'ARCHIVED' %}">
           {% csrf_token %}
@@ -57,7 +58,7 @@
         <tbody>
           {% for enrollment in active_enrollments %}
             <tr>
-              <td><a href="{% url 'education:group-detail' enrollment.group_id %}">{{ enrollment.group.name }}</a></td>
+              <td>{% if user.role == 'TEACHER' %}{{ enrollment.group.name }}{% else %}<a href="{% url 'education:group-detail' enrollment.group_id %}">{{ enrollment.group.name }}</a>{% endif %}</td>
               <td>{{ enrollment.group.course }}</td>
               <td>{{ enrollment.group.teacher }}</td>
               <td>{{ enrollment.started_at }}</td>

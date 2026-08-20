@@ -30,6 +30,7 @@
 
 <div class="panel">
   <div class="panel__body">
+    {% if teacher.photo %}<img class="teacher-photo" src="{{ teacher.photo.url }}" alt="Фото {{ teacher }}">{% endif %}
     <dl class="dl">
       <dt>Логин</dt><dd class="mono">{{ teacher.user.username }}</dd>
       <dt>Телефон</dt><dd class="mono">{{ teacher.phone|default:"—" }}</dd>
@@ -55,7 +56,7 @@
         <tbody>
           {% for group in active_groups %}
             <tr>
-              <td><a href="{% url 'education:group-detail' group.pk %}"><strong>{{ group.name }}</strong></a></td>
+              <td>{% if user.role == 'TEACHER' %}<strong>{{ group.name }}</strong>{% else %}<a href="{% url 'education:group-detail' group.pk %}"><strong>{{ group.name }}</strong></a>{% endif %}</td>
               <td>{{ group.course }}</td>
               <td class="mono">{{ group.active_students_count }}</td>
             </tr>

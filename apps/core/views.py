@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.formats import date_format
 
 from apps.accounts.models import UserRole
+from apps.accounts.permissions import owner_required
 from apps.education.materialize import materialize_range
 from apps.education.models import (
     Attendance,
@@ -343,7 +344,7 @@ PERIOD_LABELS = {
 }
 
 
-@login_required
+@owner_required
 def analytics_view(request):
     is_teacher = _is_teacher(request)
     today = timezone.localdate()

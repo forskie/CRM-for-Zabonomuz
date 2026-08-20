@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import include, path
+from django.conf import settings
+from django.conf.urls.static import static
 
 from apps.core.views import dashboard
 
@@ -17,3 +19,6 @@ urlpatterns = [
     path("", include("apps.education.urls")),
     path("health/", healthcheck, name="healthcheck"),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

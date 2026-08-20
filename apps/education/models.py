@@ -5,6 +5,7 @@ from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 
@@ -37,6 +38,7 @@ class Teacher(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="teacher_profile")
     full_name = models.CharField(max_length=255, blank=True)
     phone = models.CharField(max_length=32, blank=True, db_index=True)
+    photo = models.ImageField(upload_to="teachers/%Y/%m/", blank=True)
     status = models.CharField(max_length=16, choices=RecordStatus.choices, default=RecordStatus.ACTIVE, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -125,6 +127,36 @@ class Enrollment(models.Model):
 
     def __str__(self) -> str:
         return f"{self.student} — {self.group}"
+
+
+class Discount(models.Model):
+    name = models.CharField(max_length=150)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="discounts", null=True, blank=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="discounts", null=True, blank=True)
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    starts_at = models.DateField(default=timezone.localdate)
+    ends_at = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-is_active", "-starts_at", "name")
+
+    def clean(self):
+        errors = {}
+        if bool(self.student_id) == bool(self.group_id):
+            errors["student"] = "Выберите либо ученика, либо группу."
+        if self.percentage and self.percentage > 100:
+            errors["percentage"] = "Скидка не может превышать 100%."
+        if self.ends_at and self.ends_at < self.starts_at:
+            errors["ends_at"] = "Дата окончания не может быть раньше даты начала."
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        target = self.student or self.group
+        return f"{self.name}: {self.percentage}% — {target}"
 
 
 class Schedule(models.Model):
@@ -389,6 +421,9 @@ class Payment(models.Model):
 
 
 class AuditAction(models.TextChoices):
+    STUDENT_TRANSFER = "STUDENT_TRANSFER", _("Перевод ученика")
+    DISCOUNT_CREATE = "DISCOUNT_CREATE", _("Создание скидки")
+    DISCOUNT_EDIT = "DISCOUNT_EDIT", _("Изменение скидки")
     PAYMENT_CREATE = "PAYMENT_CREATE", _("Создание платежа")
     PAYMENT_EDIT = "PAYMENT_EDIT", _("Изменение платежа")
     PAYMENT_CANCEL = "PAYMENT_CANCEL", _("Отмена платежа")

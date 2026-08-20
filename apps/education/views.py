@@ -16,8 +16,8 @@ from apps.accounts.models import UserRole
 from apps.accounts.permissions import operational_required
 
 from .audit import record_audit
-from .forms import AttendanceBulkForm, CourseForm, EnrollmentCreateForm, EnrollmentEndForm, GroupForm, LessonForm, LessonFromScheduleForm, LessonReportForm, LessonRescheduleForm, PaymentEditForm, PaymentForm, ScheduleForm, ScheduleGenerateForm, ScheduleOverrideForm, StudentForm, TeacherCreateForm, TeacherForm
-from .models import Attendance, AttendanceStatus, AuditAction, AuditLog, Course, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, OverrideType, Payment, PaymentStatus, RecordStatus, Schedule, ScheduleOverride, Student, Teacher
+from .forms import AttendanceBulkForm, CourseForm, DiscountForm, EnrollmentCreateForm, EnrollmentEndForm, GroupForm, LessonForm, LessonFromScheduleForm, LessonReportForm, LessonRescheduleForm, PaymentEditForm, PaymentForm, ScheduleForm, ScheduleGenerateForm, ScheduleOverrideForm, StudentForm, StudentTransferForm, TeacherCreateForm, TeacherForm
+from .models import Attendance, AttendanceStatus, AuditAction, AuditLog, Course, Discount, Enrollment, EnrollmentStatus, Group, Lesson, LessonStatus, OverrideType, Payment, PaymentStatus, RecordStatus, Schedule, ScheduleOverride, Student, Teacher
 from .services import generate_lessons, preview_lessons
 from .materialize import materialize_range, reconcile_occurrence
 
@@ -185,7 +185,7 @@ def teacher_detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 @operational_required
 def teacher_create(request: HttpRequest) -> HttpResponse:
-    form = TeacherCreateForm(request.POST or None)
+    form = TeacherCreateForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         teacher = form.save()
         return redirect("education:teacher-detail", pk=teacher.pk)
@@ -195,7 +195,7 @@ def teacher_create(request: HttpRequest) -> HttpResponse:
 @operational_required
 def teacher_edit(request: HttpRequest, pk: int) -> HttpResponse:
     teacher = get_object_or_404(Teacher, pk=pk)
-    form = TeacherForm(request.POST or None, instance=teacher)
+    form = TeacherForm(request.POST or None, request.FILES or None, instance=teacher)
     if request.method == "POST" and form.is_valid():
         form.save()
         record_audit(request.user, AuditAction.TEACHER_EDIT, "Teacher", teacher.pk, str(teacher))
@@ -539,8 +539,9 @@ def lesson_list(request: HttpRequest) -> HttpResponse:
 def lesson_detail(request: HttpRequest, pk: int) -> HttpResponse:
     lesson = get_object_or_404(_lessons_for_request(request), pk=pk)
     can_edit = not _is_teacher(request) or lesson.effective_teacher.user_id == request.user.id
-    attendance_form = AttendanceBulkForm(request.POST or None, lesson=lesson)
-    report_form = LessonReportForm(request.POST or None, instance=lesson)
+    teacher_mode = _is_teacher(request)
+    attendance_form = AttendanceBulkForm(request.POST or None, lesson=lesson, teacher_mode=teacher_mode)
+    report_form = LessonReportForm(None if teacher_mode else (request.POST or None), instance=lesson)
     if request.method == "POST":
         if not can_edit:
             raise PermissionDenied
@@ -548,8 +549,10 @@ def lesson_detail(request: HttpRequest, pk: int) -> HttpResponse:
             attendance_form.add_error(None, "Нельзя изменять посещаемость отменённого занятия.")
         else:
             attendance_valid = attendance_form.is_valid()
-            report_valid = report_form.is_valid()
+            report_valid = True if teacher_mode else report_form.is_valid()
             action = request.POST.get("action", "save")
+            if teacher_mode and action != "save":
+                raise PermissionDenied
             active_ids = set(lesson.active_students().values_list("pk", flat=True))
             missing_ids = {
                 student_id for student_id in active_ids
@@ -570,8 +573,9 @@ def lesson_detail(request: HttpRequest, pk: int) -> HttpResponse:
                     if key.startswith("status_") and value
                 )
                 with transaction.atomic():
-                    report_form.save()
-                    if report_form.changed_data:
+                    if not teacher_mode:
+                        report_form.save()
+                    if not teacher_mode and report_form.changed_data:
                         record_audit(request.user, AuditAction.LESSON_REPORT, "Lesson", lesson.pk, f"{lesson.group}: {lesson.date} — тема: {lesson.topic or '—'}")
                     attendance_form.save()
                     record_audit(request.user, AuditAction.ATTENDANCE_CHANGE, "Lesson", lesson.pk, f"{lesson.group}: {lesson.date} — отмечено {marked} учеников")
@@ -609,9 +613,60 @@ def lesson_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "report_form": report_form,
         "summary": summary,
         "can_edit": can_edit,
+        "teacher_mode": teacher_mode,
         "attendance_records": records,
         "next_lesson": next_lesson,
     })
+
+
+@operational_required
+def student_transfer(request: HttpRequest, pk: int) -> HttpResponse:
+    student = get_object_or_404(Student, pk=pk)
+    form = StudentTransferForm(request.POST or None, student=student)
+    if request.method == "POST" and form.is_valid():
+        source = form.cleaned_data["enrollment"]
+        target = form.cleaned_data["target_group"]
+        transfer_date = form.cleaned_data["transfer_date"]
+        with transaction.atomic():
+            source = Enrollment.objects.select_for_update().get(pk=source.pk, student=student, status=EnrollmentStatus.ACTIVE)
+            source.status = EnrollmentStatus.ENDED
+            source.ended_at = transfer_date - timedelta(days=1)
+            source.full_clean()
+            source.save(update_fields=("status", "ended_at", "updated_at"))
+            created = Enrollment(student=student, group=target, started_at=transfer_date, status=EnrollmentStatus.ACTIVE)
+            created.full_clean()
+            created.save()
+            record_audit(request.user, AuditAction.STUDENT_TRANSFER, "Student", student.pk, f"{source.group} → {target}, {transfer_date}")
+        messages.success(request, f"{student} переведён в группу «{target}».")
+        return redirect("education:student-detail", pk=student.pk)
+    return render(request, "education/form.html", {"form": form, "title": f"Перевести ученика: {student}"})
+
+
+@operational_required
+def discount_list(request: HttpRequest) -> HttpResponse:
+    discounts = Discount.objects.select_related("student", "group")
+    return render(request, "education/discount_list.html", {"page_obj": _page(request, discounts), "pagination_qs": ""})
+
+
+@operational_required
+def discount_create(request: HttpRequest) -> HttpResponse:
+    form = DiscountForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        discount = form.save()
+        record_audit(request.user, AuditAction.DISCOUNT_CREATE, "Discount", discount.pk, str(discount))
+        return redirect("education:discount-list")
+    return render(request, "education/form.html", {"form": form, "title": "Новая скидка или акция"})
+
+
+@operational_required
+def discount_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    discount = get_object_or_404(Discount, pk=pk)
+    form = DiscountForm(request.POST or None, instance=discount)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        record_audit(request.user, AuditAction.DISCOUNT_EDIT, "Discount", discount.pk, str(discount))
+        return redirect("education:discount-list")
+    return render(request, "education/form.html", {"form": form, "title": f"Изменить скидку: {discount.name}"})
 
 
 @operational_required
@@ -696,7 +751,7 @@ def lesson_reschedule(request: HttpRequest, pk: int) -> HttpResponse:
     return render(request, "education/form.html", {"form": form, "title": f"Перенос занятия: {lesson.group} — {lesson.date}"})
 
 
-@login_required
+@operational_required
 def lesson_report(request: HttpRequest, pk: int) -> HttpResponse:
     lesson = get_object_or_404(_lessons_for_request(request), pk=pk)
     form = LessonReportForm(request.POST or None, instance=lesson)
@@ -710,7 +765,7 @@ def lesson_report(request: HttpRequest, pk: int) -> HttpResponse:
     return render(request, "education/form.html", {"form": form, "title": f"Отчёт о занятии: {lesson.group} — {lesson.date}"})
 
 
-@login_required
+@operational_required
 def lesson_complete(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method != "POST":
         raise PermissionDenied

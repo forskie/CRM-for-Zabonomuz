@@ -104,10 +104,10 @@ class Stage20FinancialPolishTests(TestCase):
         self.assertContains(response, "Ошибочная операция")
         self.assertContains(response, "badge--cancelled")
 
-    def test_teacher_navigation_has_analytics_but_no_payment_link(self):
+    def test_teacher_navigation_has_no_analytics_or_payment_link(self):
         self.client.force_login(self.teacher_user)
         response = self.client.get(reverse("dashboard"))
-        self.assertContains(response, reverse("core:analytics"))
+        self.assertNotContains(response, reverse("core:analytics"))
         self.assertNotContains(response, reverse("education:payment-list"))
 
     def test_design_system_keeps_light_dark_and_responsive_breakpoints(self):
