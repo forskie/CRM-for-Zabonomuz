@@ -6,7 +6,7 @@ from decimal import Decimal
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, TruncDay, TruncMonth
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.formats import date_format
 
@@ -115,6 +115,12 @@ def _is_teacher(request) -> bool:
 def _format_lesson_datetime(lesson) -> str:
     """Return 'Пн, 17 авг' or 'Сегодня' / 'Завтра' for the lesson date."""
     return date_format(lesson.date, "D, j E")
+
+
+def public_home(request):
+    if request.user.is_authenticated:
+        return redirect("dashboard")
+    return render(request, "core/public_home.html")
 
 
 @login_required

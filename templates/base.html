@@ -21,6 +21,8 @@
 </head>
 <body>
 {% url 'dashboard' as dashboard_url %}
+{% url 'public-home' as public_home_url %}
+{% url 'accounts:login' as login_url %}
 {% url 'education:student-list' as students_url %}
 {% url 'education:teacher-list' as teachers_url %}
 {% url 'education:course-list' as courses_url %}
@@ -41,7 +43,7 @@
       {% include "partials/icon.html" with icon="menu" %}
     </button>
     {% endif %}
-    <a class="brand" href="{{ dashboard_url }}">
+    <a class="brand" href="{% if user.is_authenticated %}{{ dashboard_url }}{% else %}{{ public_home_url }}{% endif %}">
       <span class="brand__logo">{% include "partials/icon.html" with icon="logo" %}</span>
       <span class="brand__text">Zabonomuz<small>Учебный центр</small></span>
     </a>
@@ -62,6 +64,9 @@
       {% csrf_token %}
       <button type="submit" class="btn btn--ghost btn--sm">Выйти</button>
     </form>
+    {% else %}
+      <a class="topbar-phone" href="tel:{{ center_phone_href }}" aria-label="Позвонить в учебный центр">{{ center_phone }}</a>
+      {% if request.path != login_url %}<a class="btn btn--primary btn--sm" href="{{ login_url }}">Войти</a>{% endif %}
     {% endif %}
   </div>
 </header>

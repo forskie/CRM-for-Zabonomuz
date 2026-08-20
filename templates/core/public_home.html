@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Zabonomuz — учебный центр{% endblock %}
+{% block content %}
+<div class="public-page">
+  <section class="public-hero">
+    <div class="public-hero__inner">
+      <p class="public-kicker">Учебный центр в {{ center_address }}</p>
+      <h1>Zabonomuz</h1>
+      <p class="public-lead">Обучение с понятным расписанием, контролем посещаемости и вниманием к каждому ученику.</p>
+      <div class="public-actions">
+        <a class="btn btn--primary public-call" href="tel:{{ center_phone_href }}">Позвонить {{ center_phone }}</a>
+        <a class="btn" href="{% url 'accounts:login' %}">Войти в личный кабинет</a>
+      </div>
+    </div>
+  </section>
+  <section class="public-info" aria-label="Информация для клиентов">
+    <div class="public-info__item"><strong>Расписание</strong><span>Уточните подходящие дни и время занятий по телефону.</span></div>
+    <div class="public-info__item"><strong>Группы</strong><span>Подберём группу с подходящим уровнем подготовки.</span></div>
+    <div class="public-info__item"><strong>Связь с центром</strong><a href="tel:{{ center_phone_href }}">{{ center_phone }}</a></div>
+  </section>
+</div>
+{% endblock %}

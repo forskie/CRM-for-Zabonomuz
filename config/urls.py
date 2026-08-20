@@ -4,7 +4,7 @@ from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
 
-from apps.core.views import dashboard
+from apps.core.views import dashboard, public_home
 
 
 def healthcheck(_request):
@@ -13,7 +13,8 @@ def healthcheck(_request):
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", dashboard, name="dashboard"),
+    path("", public_home, name="public-home"),
+    path("dashboard/", dashboard, name="dashboard"),
     path("accounts/", include("apps.accounts.urls")),
     path("", include("apps.core.urls")),
     path("", include("apps.education.urls")),

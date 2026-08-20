@@ -2,7 +2,7 @@
 {% block title %}Вход в CRM — CRM центра{% endblock %}
 {% block content %}
 <div class="auth-wrap">
-  <div class="auth-brand">CRM <span>центра</span></div>
+  <div class="auth-brand">Zabonomuz <span>CRM</span></div>
 
   <div class="panel auth-card">
     <div class="panel__head">
@@ -38,6 +38,10 @@
           <button type="submit" class="btn btn--primary btn--block">Войти</button>
         </div>
       </form>
+      <div class="auth-contact">
+        <span>Нужна помощь со входом?</span>
+        <a href="tel:{{ center_phone_href }}">Позвонить: {{ center_phone }}</a>
+      </div>
     </div>
   </div>
 </div>

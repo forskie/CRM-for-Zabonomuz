@@ -22,6 +22,8 @@ if not SECRET_KEY:
 
 ALLOWED_HOSTS = [host.strip() for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()]
+CENTER_PHONE = os.environ.get("CENTER_PHONE", "+992 00 000 00 00").strip()
+CENTER_ADDRESS = os.environ.get("CENTER_ADDRESS", "Душанбе").strip()
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -57,6 +59,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.core.context_processors.center_contact",
             ],
         },
     },
